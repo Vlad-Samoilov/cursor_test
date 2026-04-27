@@ -1,0 +1,357 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e10]:
+      - link "Skip to Main Content":
+        - /url: "#main-content"
+      - list [ref=e11]:
+        - listitem [ref=e12]: AllianzIM ETFs
+    - generic [ref=e18]:
+      - link "Allianz logo, Allianz Investment Management LLC Home" [ref=e22] [cursor=pointer]:
+        - /url: javascript:void(0);
+        - img [ref=e23]
+      - navigation "Main navigation" [ref=e27]:
+        - menubar [ref=e31]:
+          - menuitem "ETFs Home link" [ref=e32] [cursor=pointer]: ETFs Home
+          - menuitem "Our ETFs button" [ref=e33]: Our ETFs
+          - menuitem "Resources button" [ref=e34]: Resources
+          - menuitem "About Us button" [ref=e35]: About Us
+          - menuitem "Contact link" [ref=e36] [cursor=pointer]: Contact
+      - region "Featured info" [ref=e38]:
+        - generic [ref=e39]:
+          - button "Previous Slide" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+          - generic [ref=e45]:
+            - group [ref=e46]:
+              - generic [ref=e47]:
+                - strong [ref=e48]: "New quarterly buffered ETFs: Faster resets + more choice across major indexes."
+                - link [ref=e49] [cursor=pointer]:
+                  - /url: /product-table/?from=etfs&cb-op=month-3&segment=see-all&tab=overview
+                  - text: See the expanded lineup.
+            - group "1 of 3" [ref=e50]:
+              - generic [ref=e51]:
+                - strong [ref=e52]: New outcome period, new market opportunities.
+                - link "See ETF data for May." [ref=e53] [cursor=pointer]:
+                  - /url: /etf-resets-and-launches
+            - group [ref=e54]:
+              - generic [ref=e55]:
+                - strong [ref=e56]: The industry’s first international uncapped buffered ETF series is expanding.
+                - link [ref=e57] [cursor=pointer]:
+                  - /url: /etfs/arli
+                  - text: Meet ARLI.
+            - group [ref=e58]:
+              - generic [ref=e59]:
+                - strong [ref=e60]: "New quarterly buffered ETFs: Faster resets + more choice across major indexes."
+                - link [ref=e61] [cursor=pointer]:
+                  - /url: /product-table/?from=etfs&cb-op=month-3&segment=see-all&tab=overview
+                  - text: See the expanded lineup.
+            - group [ref=e62]:
+              - generic [ref=e63]:
+                - strong [ref=e64]: New outcome period, new market opportunities.
+                - link [ref=e65] [cursor=pointer]:
+                  - /url: /etf-resets-and-launches
+                  - text: See ETF data for May.
+          - button "Next Slide" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+  - main [ref=e70]:
+    - generic [ref=e71]:
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Our full ETF lineup" [level=1] [ref=e80]
+          - generic [ref=e81]: Use the filters below to discover AllianzIM ETFs that align with your investment goals.
+        - button "How to Invest"
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - radiogroup "Segment Filter" [ref=e89]:
+            - radio "See All" [checked] [ref=e91] [cursor=pointer]
+            - radio "Buffer Allocation ETFs" [ref=e93] [cursor=pointer]
+            - radio "Buffered ETFs" [ref=e95] [cursor=pointer]
+            - radio "100% Protection ETF" [ref=e97] [cursor=pointer]
+            - radio "Uncapped Buffered ETFs" [ref=e99] [cursor=pointer]
+            - radio "Floor ETFs" [ref=e101] [cursor=pointer]
+          - generic "Accordion. Open links with Enter or Space, close with Escape, and navigate with Arrow Keys" [ref=e104]:
+            - group [ref=e105]:
+              - 'generic "Filter: All (58 funds)" [ref=e106] [cursor=pointer]':
+                - generic [ref=e109]: "Filter: All (58 funds)"
+                - img [ref=e112]
+              - region [ref=e115]:
+                - generic [ref=e118]:
+                  - button "Clear filters"
+                  - generic [ref=e119]:
+                    - group "Protection Type" [ref=e121]:
+                      - generic [ref=e122]: Protection Type
+                      - generic [ref=e123]:
+                        - generic [ref=e125]:
+                          - checkbox "Buffer5" [ref=e126] [cursor=pointer]
+                          - img
+                        - text: Buffer5
+                      - generic [ref=e127]:
+                        - generic [ref=e129]:
+                          - checkbox "Buffer10" [ref=e130] [cursor=pointer]
+                          - img
+                        - text: Buffer10
+                      - generic [ref=e131]:
+                        - generic [ref=e133]:
+                          - checkbox "Buffer15" [ref=e134] [cursor=pointer]
+                          - img
+                        - text: Buffer15
+                      - generic [ref=e135]:
+                        - generic [ref=e137]:
+                          - checkbox "Buffer20" [ref=e138] [cursor=pointer]
+                          - img
+                        - text: Buffer20
+                      - generic [ref=e139]:
+                        - generic [ref=e141]:
+                          - checkbox "Buffer100" [ref=e142] [cursor=pointer]
+                          - img
+                        - text: Buffer100
+                      - generic [ref=e143]:
+                        - generic [ref=e145]:
+                          - checkbox "Floor5" [ref=e146] [cursor=pointer]
+                          - img
+                        - text: Floor5
+                    - generic [ref=e147]:
+                      - group "Upside Opportunity" [ref=e148]:
+                        - generic [ref=e149]: Upside Opportunity
+                        - generic [ref=e150]:
+                          - generic [ref=e152]:
+                            - checkbox "Capped" [ref=e153] [cursor=pointer]
+                            - img
+                          - text: Capped
+                        - generic [ref=e154]:
+                          - generic [ref=e156]:
+                            - checkbox "Uncapped" [ref=e157] [cursor=pointer]
+                            - img
+                          - text: Uncapped
+                      - group "Outcome Period" [ref=e158]:
+                        - generic [ref=e159]: Outcome Period
+                        - generic [ref=e160]:
+                          - generic [ref=e162]:
+                            - checkbox "3 months" [ref=e163] [cursor=pointer]
+                            - img
+                          - text: 3 months
+                        - generic [ref=e164]:
+                          - generic [ref=e166]:
+                            - checkbox "6 months" [ref=e167] [cursor=pointer]
+                            - img
+                          - text: 6 months
+                        - generic [ref=e168]:
+                          - generic [ref=e170]:
+                            - checkbox "12 months" [ref=e171] [cursor=pointer]
+                            - img
+                          - text: 12 months
+                    - group "Reference Asset" [ref=e173]:
+                      - generic [ref=e174]: Reference Asset
+                      - generic [ref=e175]:
+                        - generic [ref=e177]:
+                          - checkbox "SPY – SPDR® S&P 500® ETF Trust" [ref=e178] [cursor=pointer]
+                          - img
+                        - text: SPY – SPDR® S&P 500® ETF Trust
+                      - generic [ref=e179]:
+                        - generic [ref=e181]:
+                          - checkbox "QQQ – Invesco QQQ Trust℠" [ref=e182] [cursor=pointer]
+                          - img
+                        - text: QQQ – Invesco QQQ Trust℠
+                      - generic [ref=e183]:
+                        - generic [ref=e185]:
+                          - checkbox "IWM – iShares® Russell 2000 ETF" [ref=e186] [cursor=pointer]
+                          - img
+                        - text: IWM – iShares® Russell 2000 ETF
+                      - generic [ref=e187]:
+                        - generic [ref=e189]:
+                          - checkbox "EFA – iShares® MSCI EAFE ETF" [ref=e190] [cursor=pointer]
+                          - img
+                        - text: EFA – iShares® MSCI EAFE ETF
+                    - group "Series" [ref=e192]:
+                      - generic [ref=e193]: Series
+                      - generic [ref=e194]:
+                        - generic [ref=e196]:
+                          - checkbox "January" [ref=e197] [cursor=pointer]
+                          - img
+                        - text: January
+                      - generic [ref=e198]:
+                        - generic [ref=e200]:
+                          - checkbox "July" [ref=e201] [cursor=pointer]
+                          - img
+                        - text: July
+                      - generic [ref=e202]:
+                        - generic [ref=e204]:
+                          - checkbox "February" [ref=e205] [cursor=pointer]
+                          - img
+                        - text: February
+                      - generic [ref=e206]:
+                        - generic [ref=e208]:
+                          - checkbox "August" [ref=e209] [cursor=pointer]
+                          - img
+                        - text: August
+                      - generic [ref=e210]:
+                        - generic [ref=e212]:
+                          - checkbox "March" [ref=e213] [cursor=pointer]
+                          - img
+                        - text: March
+                      - generic [ref=e214]:
+                        - generic [ref=e216]:
+                          - checkbox "September" [ref=e217] [cursor=pointer]
+                          - img
+                        - text: September
+                      - generic [ref=e218]:
+                        - generic [ref=e220]:
+                          - checkbox "April" [ref=e221] [cursor=pointer]
+                          - img
+                        - text: April
+                      - generic [ref=e222]:
+                        - generic [ref=e224]:
+                          - checkbox "October" [ref=e225] [cursor=pointer]
+                          - img
+                        - text: October
+                      - generic [ref=e226]:
+                        - generic [ref=e228]:
+                          - checkbox "May" [ref=e229] [cursor=pointer]
+                          - img
+                        - text: May
+                      - generic [ref=e230]:
+                        - generic [ref=e232]:
+                          - checkbox "November" [ref=e233] [cursor=pointer]
+                          - img
+                        - text: November
+                      - generic [ref=e234]:
+                        - generic [ref=e236]:
+                          - checkbox "June" [ref=e237] [cursor=pointer]
+                          - img
+                        - text: June
+                      - generic [ref=e238]:
+                        - generic [ref=e240]:
+                          - checkbox "December" [ref=e241] [cursor=pointer]
+                          - img
+                        - text: December
+                  - generic [ref=e242]:
+                    - generic [ref=e243]:
+                      - generic [ref=e244]: Downside before Protection
+                      - generic [ref=e245]:
+                        - generic [ref=e246]:
+                          - generic [ref=e247]:
+                            - generic [ref=e248]: From
+                            - generic [ref=e249]:
+                              - spinbutton "From" [ref=e250]: "1"
+                              - text: "%"
+                          - generic [ref=e251]:
+                            - generic [ref=e252]: To
+                            - generic [ref=e253]:
+                              - spinbutton "To" [ref=e254]: "20"
+                              - text: "%"
+                        - generic [ref=e256] [cursor=pointer]:
+                          - generic [ref=e258]: 1%
+                          - generic [ref=e259]: 20%
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: Days Remaining in Outcome Period
+                      - generic [ref=e262]:
+                        - generic [ref=e263]:
+                          - generic [ref=e264]:
+                            - generic [ref=e265]: From
+                            - spinbutton "From" [ref=e267]: "6"
+                          - generic [ref=e268]:
+                            - generic [ref=e269]: To
+                            - spinbutton "To" [ref=e271]: "341"
+                        - generic [ref=e273] [cursor=pointer]:
+                          - generic [ref=e275]: "6"
+                          - generic [ref=e276]: "341"
+                    - generic [ref=e277]:
+                      - generic [ref=e278]: "% of Cap Attained"
+                      - generic [ref=e279]:
+                        - generic [ref=e280]:
+                          - generic [ref=e281]:
+                            - generic [ref=e282]: From
+                            - generic [ref=e283]:
+                              - spinbutton "From" [ref=e284]: "0"
+                              - text: "%"
+                          - generic [ref=e285]:
+                            - generic [ref=e286]: To
+                            - generic [ref=e287]:
+                              - spinbutton "To" [ref=e288]: "100"
+                              - text: "%"
+                        - generic [ref=e290] [cursor=pointer]:
+                          - generic [ref=e292]: 0%
+                          - generic [ref=e293]: 100%
+        - generic "Tabs. Open items with Enter or Space, close with Escape and navigate using the Arrow keys." [ref=e297]:
+          - tablist [ref=e298]:
+            - tab "Overview & Fees" [selected] [ref=e299] [cursor=pointer]:
+              - generic [ref=e300]: Overview & Fees
+            - tab "Characteristics" [ref=e301] [cursor=pointer]:
+              - generic [ref=e302]: Characteristics
+            - tab "Performance" [ref=e303] [cursor=pointer]:
+              - generic [ref=e304]: Performance
+            - tab "Documents" [ref=e305] [cursor=pointer]:
+              - generic [ref=e306]: Documents
+          - generic:
+            - generic:
+              - status "Loading..."
+      - generic:
+        - generic:
+          - generic:
+            - link "Contact Us":
+              - /url: "#contact-us-popup"
+              - button "Contact Us" [ref=e320] [cursor=pointer]
+  - contentinfo [ref=e321]:
+    - generic [ref=e328]:
+      - navigation "Footer links" [ref=e329]:
+        - generic [ref=e330]:
+          - generic [ref=e331]:
+            - heading "Invest in ETFs" [level=3] [ref=e332]
+            - list [ref=e333]:
+              - listitem [ref=e334]:
+                - link "Product Table" [ref=e335] [cursor=pointer]:
+                  - /url: /product-table/?from=menu
+              - listitem [ref=e336]:
+                - link "Recent Resets and Launches" [ref=e337] [cursor=pointer]:
+                  - /url: /etf-resets-and-launches/
+              - listitem [ref=e338]:
+                - link "Education Hub" [ref=e339] [cursor=pointer]:
+                  - /url: /education-hub/
+          - generic [ref=e340]:
+            - heading "Our Products" [level=3] [ref=e341]
+            - list [ref=e342]:
+              - listitem [ref=e343]:
+                - link "Buffered ETFs" [ref=e344] [cursor=pointer]:
+                  - /url: /bufferETFs/
+              - listitem [ref=e345]:
+                - link "Buffer100 ETF" [ref=e346] [cursor=pointer]:
+                  - /url: /100protectionETF/
+              - listitem [ref=e347]:
+                - link "Uncapped Buffered ETFs" [ref=e348] [cursor=pointer]:
+                  - /url: /uncappedbuffer15/
+              - listitem [ref=e349]:
+                - link "Floor ETFs" [ref=e350] [cursor=pointer]:
+                  - /url: /floor5/
+              - listitem [ref=e351]:
+                - link "Buffer Allocation ETFs" [ref=e352] [cursor=pointer]:
+                  - /url: /bufferallocation/
+          - generic [ref=e353]:
+            - heading "About AllianzIM" [level=3] [ref=e354]
+            - list [ref=e355]:
+              - listitem [ref=e356]:
+                - link "Contact" [ref=e357] [cursor=pointer]:
+                  - /url: /contact/
+              - listitem [ref=e358]:
+                - link "Our Team" [ref=e359] [cursor=pointer]:
+                  - /url: javascript:void(0);
+      - navigation "Service links" [ref=e360]:
+        - generic [ref=e361]: © 2026 Allianz Investment Management LLC. All rights reserved.
+        - generic [ref=e362]:
+          - link "Accessibility Policy" [ref=e363] [cursor=pointer]:
+            - /url: javascript:void(0);
+          - generic [ref=e364]: "|"
+          - link "Terms of Use" [ref=e365] [cursor=pointer]:
+            - /url: javascript:void(0);
+  - generic [ref=e368]:
+    - paragraph [ref=e369]:
+      - strong [ref=e370]: "Please note:"
+      - text: We use cookies to make your online experience more convenient. For more information view our
+      - link "Privacy Policy" [ref=e371] [cursor=pointer]:
+        - /url: /terms-of-use
+        - text: Privacy Policy.
+    - link " Dismiss" [ref=e372] [cursor=pointer]:
+      - generic [ref=e373]: 
+      - text: Dismiss
+  - text: Show more Enabled
+  - generic [ref=e374]: desktop
+  - generic:
+    - generic: 

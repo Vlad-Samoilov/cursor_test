@@ -1,0 +1,26 @@
+{
+  "name": "allianz_smoke_2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "report": "playwright show-report",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed --workers=1",
+    "test:product-table": "playwright test tests/product-table.spec.ts --workers=1",
+    "test:product-table:headed": "playwright test tests/product-table.spec.ts --headed --workers=1",
+    "test:fund-page": "playwright test tests/fund-page.spec.ts --workers=1",
+    "test:fund-page:headed": "playwright test tests/fund-page.spec.ts --headed --workers=1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0",
+    "date-holidays": "^3.27.0",
+    "luxon": "^3.7.2",
+    "nodemailer": "^8.0.6"
+  }
+}
