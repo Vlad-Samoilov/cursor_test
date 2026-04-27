@@ -89,6 +89,7 @@ const testStatus = process.env.TEST_STATUS ?? 'unknown';
 const runUrl = githubRunUrl();
 
 const summary =
+  readOptionalText(path.join(process.cwd(), 'playwright-summary.txt')) ??
   readOptionalText(path.join(process.cwd(), 'playwright-report', 'summary.txt')) ??
   readOptionalText(path.join(process.cwd(), 'test-results', 'summary.txt')) ??
   null;

@@ -57,7 +57,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          npm test 2>&1 | tee playwright-report/summary.txt
+          mkdir -p playwright-report test-results
+          npm test 2>&1 | tee playwright-summary.txt
 
       - name: Determine status
         if: ${{ steps.guard.outputs.run == 'true' }}
