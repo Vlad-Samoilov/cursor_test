@@ -2,8 +2,11 @@ name: Daily Playwright tests
 
 on:
   schedule:
-    # Daily at 06:00 UTC
-    - cron: "0 6 * * *"
+    # GitHub Actions cron is UTC only.
+    # 07:30 America/New_York is either 12:30 UTC (during EDT) or 13:30 UTC (during EST),
+    # so we trigger at both and gate the job by checking NY local time.
+    - cron: "30 12 * * *"
+    - cron: "30 13 * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -11,22 +14,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Guard: run only at 07:30 ET
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(TZ=America/New_York date +%H:%M)"
+          if [ "$now" = "07:30" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping: NY local time is $now (not 07:30)."
+          fi
+
       - name: Checkout
+        if: ${{ steps.guard.outputs.run == 'true' }}
         uses: actions/checkout@v4
 
       - name: Setup Node
+        if: ${{ steps.guard.outputs.run == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: ${{ steps.guard.outputs.run == 'true' }}
         run: npm ci
 
       - name: Install Playwright browsers
+        if: ${{ steps.guard.outputs.run == 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Run tests
+        if: ${{ steps.guard.outputs.run == 'true' }}
         id: tests
         continue-on-error: true
         run: |
@@ -34,6 +55,7 @@ jobs:
           npm test 2>&1 | tee playwright-report/summary.txt
 
       - name: Determine status
+        if: ${{ steps.guard.outputs.run == 'true' }}
         id: status
         run: |
           if [ "${{ steps.tests.outcome }}" = "success" ]; then
@@ -43,7 +65,7 @@ jobs:
           fi
 
       - name: Upload Playwright report
-        if: always()
+        if: ${{ always() && steps.guard.outputs.run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
@@ -54,7 +76,7 @@ jobs:
           retention-days: 14
 
       - name: Email results (Gmail SMTP)
-        if: always()
+        if: ${{ always() && steps.guard.outputs.run == 'true' }}
         env:
           TEST_STATUS: ${{ steps.status.outputs.status }}
           SMTP_HOST: smtp.gmail.com
@@ -66,6 +88,6 @@ jobs:
         run: node scripts/send-smtp-report.mjs
 
       - name: Fail job if tests failed
-        if: ${{ steps.tests.outcome != 'success' }}
+        if: ${{ steps.guard.outputs.run == 'true' && steps.tests.outcome != 'success' }}
         run: exit 1
 
