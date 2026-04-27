@@ -19,6 +19,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run: proceeding."
+            exit 0
+          fi
           now="$(TZ=America/New_York date +%H:%M)"
           if [ "$now" = "07:30" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
