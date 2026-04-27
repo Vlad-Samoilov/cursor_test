@@ -164,8 +164,6 @@ const subject = `${subjectPrefix} ${testStatus.toUpperCase()} - ${process.env.GI
 
 const parsed = summary ? parsePlaywrightSummary(summary) : null;
 const failedDetails = summary ? extractFailedTestDetails(summary) : [];
-const failuresForList =
-  parsed?.failures?.length ? parsed.failures : failedDetails.map((t) => t.name).filter(Boolean);
 
 const headlineParts = [
   parsed?.passed != null ? `${parsed.passed} passed` : null,
@@ -179,11 +177,6 @@ const bodyLines = [
   headlineParts.length ? `Results: ${headlineParts.join(', ')}` : null,
   runUrl ? `GitHub run: ${runUrl}` : null,
   '',
-  failuresForList.length ? 'Failed tests:' : parsed?.failed ? 'Failed tests:' : null,
-  ...(failuresForList.length ? failuresForList.slice(0, 20).map((t) => `- ${t}`) : []),
-  !failuresForList.length && parsed?.failed ? '- (Could not extract failed test names from output)' : null,
-  failuresForList.length && failuresForList.length > 20 ? `- ... and ${failuresForList.length - 20} more` : null,
-  (failuresForList.length || parsed?.failed) ? '' : null,
   'Artifacts:',
   '- Playwright HTML report is uploaded as workflow artifact: "playwright-report"',
   '- Trace/video/screenshots are under artifact folder: "test-results"',
@@ -206,23 +199,6 @@ const html = `
     <h2 style="margin: 0 0 8px 0;">${escapeHtml(subjectPrefix)} ${escapeHtml(testStatus.toUpperCase())}</h2>
     ${headlineParts.length ? `<div><b>Results:</b> ${escapeHtml(headlineParts.join(', '))}</div>` : ''}
     ${runUrl ? `<div><b>GitHub run:</b> <a href="${escapeHtml(runUrl)}">${escapeHtml(runUrl)}</a></div>` : ''}
-    ${
-      failuresForList.length
-        ? `<h3 style="margin: 16px 0 8px 0;">Failed tests</h3>
-           <ul>${failuresForList
-             .slice(0, 20)
-             .map((t) => `<li><code>${escapeHtml(t)}</code></li>`)
-             .join('')}
-           ${
-             failuresForList.length > 20
-               ? `<li><i>... and ${failuresForList.length - 20} more</i></li>`
-               : ''
-           }
-           </ul>`
-        : parsed?.failed
-          ? `<h3 style="margin: 16px 0 8px 0;">Failed tests</h3><div><i>Could not extract failed test names from output.</i></div>`
-          : `<div style="margin-top: 16px;"><b>No failed tests.</b></div>`
-    }
     <h3 style="margin: 16px 0 8px 0;">Artifacts</h3>
     <ul>
       <li>Playwright HTML report artifact: <code>playwright-report</code></li>
