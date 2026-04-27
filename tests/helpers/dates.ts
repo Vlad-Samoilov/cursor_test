@@ -213,28 +213,12 @@ export const expectedAsOf = {
           : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'During early window, Outcome UI shows previous working day.');
     },
     holdingsUi(): ExpectedUsMdy {
-      const { y, m, d } = todayPartsET();
-      return isWeekendET()
-        ? expectedUsMdyOneOf(
-            [todayET_usMdy(), previousWorkingDayET_usMdy_n(1)],
-            'Weekend tolerance: Holdings can show today or previous working day snapshot.',
-          )
-        : expectedUsMdyExact(
-            todayET_usMdy(),
-            isUsWorkingDayET(y, m, d)
-              ? 'Holdings table is expected to be today.'
-              : 'Holdings table is expected to be today (even on weekdays that are non-working days).',
-          );
+      return expectedUsMdyExact(todayET_usMdy(), 'Holdings table shows today (FoF and non-FoF).');
     },
     holdingsFofChartStamp(): ExpectedUsMdy {
       return currentAsOfPublishWindowET() === 'after_window'
-        ? expectedUsMdyExact(todayET_usMdy(), 'After intraday publish window, FoF holdings chart stamp should be today.')
-        : isWeekendET()
-          ? expectedUsMdyOneOf(
-              [previousWorkingDayET_usMdy_n(1), previousWorkingDayET_usMdy_n(2)],
-              'Weekend tolerance: during early window, FoF holdings chart stamp can lag by one extra working day.',
-            )
-          : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'During early window, FoF holdings chart stamp is previous working day.');
+        ? expectedUsMdyExact(todayET_usMdy(), 'After 09:50 ET, FoF holdings chart stamp is today.')
+        : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'Before 09:50 ET, FoF holdings chart stamp is previous working day.');
     },
     performanceUi(): ExpectedUsMdy {
       return expectedUsMdyExact(lastDayOfPreviousMonthET_usMdy(), 'Performance uses prior month-end snapshot.');

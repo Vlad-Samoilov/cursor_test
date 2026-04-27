@@ -281,15 +281,16 @@ export class FundPage {
       await this.assertAllDataTablesFilled(panel, 'Holdings tab (FoF) tables');
 
       const chartExpected = expectedAsOf.fund.holdingsFofChartStamp();
-      const chartAsOf = text.match(
-        /Data as of (\d{1,2}\/\d{1,2}\/\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?\s+PM\s+E(?:S|D)T)?/i,
-      );
-      expect(chartAsOf, 'Holdings tab (FoF): expected chart "Data as of M/D/YYYY ..." stamp').toBeTruthy();
-      assertUsMdyMatchesExpected(
-        normalizeUsMdy(chartAsOf![1]),
-        chartExpected,
-        'Fund page → Holdings (FoF chart stamp)',
-      );
+      // The FoF holdings view contains TWO "Data as of" stamps: one above the holdings table (today),
+      // and another for the chart. We want the chart one — empirically it appears later in the panel.
+      const stamps = panel.getByText(/Data as of\s+\d{1,2}\/\d{1,2}\/\d{4}/i);
+      const sn = await stamps.count();
+      expect(sn, 'Holdings tab (FoF): expected at least one "Data as of M/D/YYYY" stamp').toBeGreaterThan(0);
+      const lastStamp = stamps.nth(sn - 1);
+      const lastText = ((await lastStamp.innerText().catch(() => '')) ?? '').trim().replace(/\s+/g, ' ');
+      const m = lastText.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
+      expect(m, `Holdings tab (FoF): could not parse US date from chart stamp: ${JSON.stringify(lastText)}`).toBeTruthy();
+      assertUsMdyMatchesExpected(normalizeUsMdy(m![1]!), chartExpected, 'Fund page → Holdings (FoF chart stamp)');
 
       const chartRegion = panel.getByRole('group', { name: /Highcharts interactive chart/i });
       await expect(chartRegion, 'Holdings tab (FoF): expected a Highcharts interactive chart region').toBeVisible();
