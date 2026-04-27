@@ -3,10 +3,8 @@ name: Daily Playwright tests
 on:
   schedule:
     # GitHub Actions cron is UTC only.
-    # 07:30 America/New_York is either 12:30 UTC (during EDT) or 13:30 UTC (during EST),
-    # so we trigger at both and gate the job by checking NY local time.
-    - cron: "30 12 * * *"
-    - cron: "30 13 * * *"
+    # 11:30 UTC = 07:30 in New York during EDT (summer time).
+    - cron: "30 11 * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -24,13 +22,8 @@ jobs:
             echo "Manual run: proceeding."
             exit 0
           fi
-          now="$(TZ=America/New_York date +%H:%M)"
-          if [ "$now" = "07:30" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: NY local time is $now (not 07:30)."
-          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "Scheduled run: proceeding."
 
       - name: Checkout
         if: ${{ steps.guard.outputs.run == 'true' }}
