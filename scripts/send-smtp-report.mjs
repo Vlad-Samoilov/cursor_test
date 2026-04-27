@@ -34,8 +34,11 @@ function readOptionalText(p) {
 
 function parsePlaywrightSummary(raw) {
   const stripAnsi = (s) =>
+    // Robust ANSI stripper (covers SGR and other CSI sequences)
     // eslint-disable-next-line no-control-regex
-    String(s).replace(/\u001B\[[0-9;]*[A-Za-z]/g, '').replace(/\u001B\][^\u0007]*\u0007/g, '');
+    String(s)
+      .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+      .replace(/\u001B\][^\u0007]*\u0007/g, '');
 
   const lines = raw.split(/\r?\n/).map(stripAnsi);
 
@@ -62,9 +65,10 @@ function parsePlaywrightSummary(raw) {
 
   // Collect failed test titles from the list reporter:
   // "  x   2 [chromium] › tests\\fund-page.spec.ts:10:9 › Fund page @smoke › Floor5: fund page checks (31.9s)"
+  // Some outputs use symbols like "✘" or "×" instead of "x".
   const failures = lines
     .map((l) => {
-      const m = l.match(/^\s*x\s+\d+\s+\[[^\]]+]\s+›\s+(.+?)\s*$/);
+      const m = l.match(/^\s*[xX✘×]\s+\d+\s+\[[^\]]+]\s+›\s+(.+?)\s*$/);
       if (!m?.[1]) return null;
       // Remove trailing duration like " (31.9s)" or " (2.4m)" if present.
       return m[1].replace(/\s+\(\d+(?:\.\d+)?[sm]\)\s*$/i, '').trim();
@@ -86,7 +90,9 @@ function parsePlaywrightSummary(raw) {
 function extractFailedTestDetails(raw) {
   const stripAnsi = (s) =>
     // eslint-disable-next-line no-control-regex
-    String(s).replace(/\u001B\[[0-9;]*[A-Za-z]/g, '').replace(/\u001B\][^\u0007]*\u0007/g, '');
+    String(s)
+      .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+      .replace(/\u001B\][^\u0007]*\u0007/g, '');
   const lines = raw.split(/\r?\n/).map(stripAnsi);
 
   /** @type {Array<{ index: number, name: string, error?: string, reason?: string, shown?: string, expected?: string }>} */
@@ -158,6 +164,8 @@ const subject = `${subjectPrefix} ${testStatus.toUpperCase()} - ${process.env.GI
 
 const parsed = summary ? parsePlaywrightSummary(summary) : null;
 const failedDetails = summary ? extractFailedTestDetails(summary) : [];
+const failuresForList =
+  parsed?.failures?.length ? parsed.failures : failedDetails.map((t) => t.name).filter(Boolean);
 
 const headlineParts = [
   parsed?.passed != null ? `${parsed.passed} passed` : null,
@@ -171,10 +179,11 @@ const bodyLines = [
   headlineParts.length ? `Results: ${headlineParts.join(', ')}` : null,
   runUrl ? `GitHub run: ${runUrl}` : null,
   '',
-  parsed?.failures?.length ? 'Failed tests:' : null,
-  ...(parsed?.failures?.length ? parsed.failures.slice(0, 20).map((t) => `- ${t}`) : []),
-  parsed?.failures?.length && parsed.failures.length > 20 ? `- ... and ${parsed.failures.length - 20} more` : null,
-  parsed?.failures?.length ? '' : null,
+  failuresForList.length ? 'Failed tests:' : parsed?.failed ? 'Failed tests:' : null,
+  ...(failuresForList.length ? failuresForList.slice(0, 20).map((t) => `- ${t}`) : []),
+  !failuresForList.length && parsed?.failed ? '- (Could not extract failed test names from output)' : null,
+  failuresForList.length && failuresForList.length > 20 ? `- ... and ${failuresForList.length - 20} more` : null,
+  (failuresForList.length || parsed?.failed) ? '' : null,
   'Artifacts:',
   '- Playwright HTML report is uploaded as workflow artifact: "playwright-report"',
   '- Trace/video/screenshots are under artifact folder: "test-results"',
@@ -198,19 +207,21 @@ const html = `
     ${headlineParts.length ? `<div><b>Results:</b> ${escapeHtml(headlineParts.join(', '))}</div>` : ''}
     ${runUrl ? `<div><b>GitHub run:</b> <a href="${escapeHtml(runUrl)}">${escapeHtml(runUrl)}</a></div>` : ''}
     ${
-      parsed?.failures?.length
+      failuresForList.length
         ? `<h3 style="margin: 16px 0 8px 0;">Failed tests</h3>
-           <ul>${parsed.failures
+           <ul>${failuresForList
              .slice(0, 20)
              .map((t) => `<li><code>${escapeHtml(t)}</code></li>`)
              .join('')}
            ${
-             parsed.failures.length > 20
-               ? `<li><i>... and ${parsed.failures.length - 20} more</i></li>`
+             failuresForList.length > 20
+               ? `<li><i>... and ${failuresForList.length - 20} more</i></li>`
                : ''
            }
            </ul>`
-        : `<div style="margin-top: 16px;"><b>No failed tests.</b></div>`
+        : parsed?.failed
+          ? `<h3 style="margin: 16px 0 8px 0;">Failed tests</h3><div><i>Could not extract failed test names from output.</i></div>`
+          : `<div style="margin-top: 16px;"><b>No failed tests.</b></div>`
     }
     <h3 style="margin: 16px 0 8px 0;">Artifacts</h3>
     <ul>
