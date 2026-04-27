@@ -83,6 +83,60 @@ function parsePlaywrightSummary(raw) {
   return { passed, failed, skipped, duration, failures: uniqueFailures };
 }
 
+function extractFailedTestDetails(raw) {
+  const stripAnsi = (s) =>
+    // eslint-disable-next-line no-control-regex
+    String(s).replace(/\u001B\[[0-9;]*[A-Za-z]/g, '').replace(/\u001B\][^\u0007]*\u0007/g, '');
+  const lines = raw.split(/\r?\n/).map(stripAnsi);
+
+  /** @type {Array<{ index: number, name: string, error?: string, reason?: string, shown?: string, expected?: string }>} */
+  const out = [];
+
+  // Playwright failure sections typically look like:
+  // "  1) [chromium] › tests\\file.spec.ts:10:9 › Suite › Test name"
+  // followed by some lines including e.g.
+  // "Error: ...", "Reason: ...", "Shown on site or CSV: ...", "Expected: ..."
+  for (let i = 0; i < lines.length; i++) {
+    const header = lines[i]?.match(/^\s*(\d+)\)\s+\[[^\]]+]\s+›\s+(.+)\s*$/);
+    if (!header) continue;
+
+    const idx = Number(header[1]);
+    const name = header[2].trim();
+
+    let error;
+    let reason;
+    let shown;
+    let expected;
+
+    // Scan until next "N) [browser]" header or the end.
+    for (let j = i + 1; j < lines.length; j++) {
+      const l = lines[j] ?? '';
+      if (/^\s*\d+\)\s+\[[^\]]+]\s+›\s+/.test(l)) break;
+
+      const trimmed = l.trim();
+      if (!trimmed) continue;
+
+      // Prefer the first "Error:" line; otherwise pick TimeoutError / locator.* timeout line.
+      if (!error) {
+        if (/^Error:\s*/i.test(trimmed)) error = trimmed.replace(/^Error:\s*/i, '').trim();
+        else if (/^(TimeoutError|Error)\b/.test(trimmed)) error = trimmed;
+      }
+
+      if (!reason && /^Reason:\s*/i.test(trimmed)) reason = trimmed.replace(/^Reason:\s*/i, '').trim();
+      if (!shown && /^Shown on site or CSV:\s*/i.test(trimmed))
+        shown = trimmed.replace(/^Shown on site or CSV:\s*/i, '').trim();
+      if (!expected && /^Expected:\s*/i.test(trimmed)) expected = trimmed.replace(/^Expected:\s*/i, '').trim();
+
+      // Some errors format "Shown on site: ..." (UI only)
+      if (!shown && /^Shown on site:\s*/i.test(trimmed)) shown = trimmed.replace(/^Shown on site:\s*/i, '').trim();
+    }
+
+    out.push({ index: idx, name, error, reason, shown, expected });
+  }
+
+  return out;
+}
+
 const smtpHost = process.env.SMTP_HOST ?? 'smtp.office365.com';
 const smtpPort = Number(process.env.SMTP_PORT ?? '587');
 const smtpUser = requiredEnv('SMTP_USER');
@@ -103,6 +157,7 @@ const subjectPrefix = process.env.SUBJECT_PREFIX ?? '[Daily E2E]';
 const subject = `${subjectPrefix} ${testStatus.toUpperCase()} - ${process.env.GITHUB_REPOSITORY ?? ''}`.trim();
 
 const parsed = summary ? parsePlaywrightSummary(summary) : null;
+const failedDetails = summary ? extractFailedTestDetails(summary) : [];
 
 const headlineParts = [
   parsed?.passed != null ? `${parsed.passed} passed` : null,
@@ -124,8 +179,17 @@ const bodyLines = [
   '- Playwright HTML report is uploaded as workflow artifact: "playwright-report"',
   '- Trace/video/screenshots are under artifact folder: "test-results"',
   '',
-  summary ? 'Raw output (tail):' : null,
-  summary ? summary.split(/\r?\n/).slice(-120).join('\n') : null,
+  failedDetails.length ? 'Raw output:' : null,
+  ...(failedDetails.length
+    ? failedDetails.flatMap((t) => [
+        `${t.index}) ${t.name}`,
+        t.error ? `  Error: ${t.error}` : '  Error: (not found)',
+        t.reason ? `    Reason: ${t.reason}` : '    Reason: (not found)',
+        t.shown ? `    Shown on site or CSV: ${t.shown}` : '    Shown on site or CSV: (not found)',
+        t.expected ? `    Expected: ${t.expected}` : '    Expected: (not found)',
+        '',
+      ])
+    : []),
 ].filter((x) => x !== null);
 
 const html = `
@@ -154,11 +218,20 @@ const html = `
       <li>Traces/videos/screenshots artifact folder: <code>test-results</code></li>
     </ul>
     ${
-      summary
-        ? `<h3 style="margin: 16px 0 8px 0;">Raw output (tail)</h3>
-           <pre style="white-space: pre-wrap; background: #f6f8fa; padding: 12px; border-radius: 8px; border: 1px solid #d0d7de;">${escapeHtml(
-             summary.split(/\r?\n/).slice(-120).join('\n'),
-           )}</pre>`
+      failedDetails.length
+        ? `<h3 style="margin: 16px 0 8px 0;">Raw output</h3>
+           ${failedDetails
+             .map(
+               (t) => `
+             <div style="margin: 10px 0 14px 0;">
+               <div><b>${escapeHtml(String(t.index))})</b> <code>${escapeHtml(t.name)}</code></div>
+               <div style="margin-left: 12px;"><b>Error:</b> ${escapeHtml(t.error ?? '(not found)')}</div>
+               <div style="margin-left: 12px;"><b>Reason:</b> ${escapeHtml(t.reason ?? '(not found)')}</div>
+               <div style="margin-left: 12px;"><b>Shown on site or CSV:</b> ${escapeHtml(t.shown ?? '(not found)')}</div>
+               <div style="margin-left: 12px;"><b>Expected:</b> ${escapeHtml(t.expected ?? '(not found)')}</div>
+             </div>`,
+             )
+             .join('')}`
         : ''
     }
   </div>
