@@ -33,7 +33,11 @@ function readOptionalText(p) {
 }
 
 function parsePlaywrightSummary(raw) {
-  const lines = raw.split(/\r?\n/);
+  const stripAnsi = (s) =>
+    // eslint-disable-next-line no-control-regex
+    String(s).replace(/\u001B\[[0-9;]*[A-Za-z]/g, '').replace(/\u001B\][^\u0007]*\u0007/g, '');
+
+  const lines = raw.split(/\r?\n/).map(stripAnsi);
 
   // Examples near the end:
   // "  10 passed (47.5s)"
@@ -60,9 +64,10 @@ function parsePlaywrightSummary(raw) {
   // "  x   2 [chromium] › tests\\fund-page.spec.ts:10:9 › Fund page @smoke › Floor5: fund page checks (31.9s)"
   const failures = lines
     .map((l) => {
-      const m = l.match(/^\s*x\s+\d+\s+\[[^\]]+]\s+›\s+(.*?)(?:\s+\([\d.]+[sm]|\s+\([\d.]+m)?\)\s*$/i);
-      if (!m) return null;
-      return m[1]?.trim() || null;
+      const m = l.match(/^\s*x\s+\d+\s+\[[^\]]+]\s+›\s+(.+?)\s*$/);
+      if (!m?.[1]) return null;
+      // Remove trailing duration like " (31.9s)" or " (2.4m)" if present.
+      return m[1].replace(/\s+\(\d+(?:\.\d+)?[sm]\)\s*$/i, '').trim();
     })
     .filter(Boolean);
 
