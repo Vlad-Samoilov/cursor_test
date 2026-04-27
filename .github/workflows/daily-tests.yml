@@ -53,14 +53,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Email results (Outlook SMTP)
+      - name: Email results (Gmail SMTP)
         if: always()
         env:
           TEST_STATUS: ${{ steps.status.outputs.status }}
-          SMTP_HOST: smtp.office365.com
+          SMTP_HOST: smtp.gmail.com
           SMTP_PORT: "587"
-          SMTP_USER: ${{ secrets.OUTLOOK_SMTP_USER }}
-          SMTP_PASS: ${{ secrets.OUTLOOK_SMTP_PASS }}
+          SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
+          SMTP_PASS: ${{ secrets.GMAIL_SMTP_PASS }}
           MAIL_TO: vladislav.samoylov@dataart.com
           SUBJECT_PREFIX: "[Daily Playwright]"
         run: node scripts/send-smtp-report.mjs
