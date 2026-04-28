@@ -12,40 +12,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Guard: run only at 07:30 ET"
-        id: guard
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Manual run: proceeding."
-            exit 0
-          fi
-          echo "run=true" >> "$GITHUB_OUTPUT"
-          echo "Scheduled run: proceeding."
-
       - name: Checkout
-        if: ${{ steps.guard.outputs.run == 'true' }}
         uses: actions/checkout@v4
 
       - name: Setup Node
-        if: ${{ steps.guard.outputs.run == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
-        if: ${{ steps.guard.outputs.run == 'true' }}
         run: npm ci
 
       - name: Install Playwright browsers
-        if: ${{ steps.guard.outputs.run == 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Run tests
-        if: ${{ steps.guard.outputs.run == 'true' }}
         id: tests
         continue-on-error: true
         run: |
@@ -54,7 +36,6 @@ jobs:
           npm test 2>&1 | tee playwright-summary.txt
 
       - name: Determine status
-        if: ${{ steps.guard.outputs.run == 'true' }}
         id: status
         run: |
           if [ "${{ steps.tests.outcome }}" = "success" ]; then
@@ -64,7 +45,7 @@ jobs:
           fi
 
       - name: Upload Playwright report
-        if: ${{ always() && steps.guard.outputs.run == 'true' }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
@@ -75,7 +56,7 @@ jobs:
           retention-days: 14
 
       - name: Email results (Gmail SMTP)
-        if: ${{ always() && steps.guard.outputs.run == 'true' }}
+        if: always()
         env:
           TEST_STATUS: ${{ steps.status.outputs.status }}
           SMTP_HOST: smtp.gmail.com
@@ -87,6 +68,6 @@ jobs:
         run: node scripts/send-smtp-report.mjs
 
       - name: Fail job if tests failed
-        if: ${{ steps.guard.outputs.run == 'true' && steps.tests.outcome != 'success' }}
+        if: ${{ steps.tests.outcome != 'success' }}
         run: exit 1
 
