@@ -4,7 +4,7 @@ on:
   schedule:
     # GitHub Actions cron is UTC only.
     # 11:30 UTC = 07:30 in New York during EDT (summer time).
-    - cron: "30 11 * * *"
+    - cron: "30 12 * * *"
   workflow_dispatch: {}
 
 jobs:
