@@ -1,6 +1,6 @@
 name: Daily Playwright tests
 
-on:
+"on":
   schedule:
     # TEMP: every 10 minutes to verify schedule triggers.
     # Once we see `schedule` runs firing, we’ll switch back to the desired daily time.
