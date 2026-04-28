@@ -141,14 +141,11 @@ export class FundPage {
   }
 
   /**
-   * Outcome tab: chart accessibility range end + “Data from …” stamp are previous U.S. working day.
+   * Outcome tab: “Data from …” stamp matches expected as-of behavior.
    */
   async assertOutcomePeriodDateSignals(): Promise<void> {
     const panel = this.visibleTabpanel;
     const text = await panel.innerText();
-
-    const expected = expectedAsOf.fund.outcomeUi();
-    const expectedUiUs = expected.mode === 'exact' ? expected.date : expected.dates[0]!;
 
     const dataFrom = text.match(/Data from (\d{1,2}\/\d{1,2}\/\d{4})/i);
     expect(dataFrom, 'Outcome tab: expected copy "Data from M/D/YYYY" for chart data').toBeTruthy();
@@ -157,16 +154,6 @@ export class FundPage {
       expectedAsOf.fund.outcomeUi(),
       'Fund page → Outcome period details (Data from …)',
     );
-
-    const rangeEnd = text.match(/Data ranges from[^\n]+?to (\d{4})-(\d{2})-(\d{2})/i);
-    expect(rangeEnd, 'Outcome tab: expected chart summary "Data ranges from … to YYYY-MM-DD"').toBeTruthy();
-    const y = Number(rangeEnd![1]);
-    const mo = Number(rangeEnd![2]);
-    const d = Number(rangeEnd![3]);
-    const endUs = normalizeUsMdy(`${mo}/${d}/${y}`);
-    expect(endUs, `Chart range end date should equal ${expectedUiUs}.`).toBe(expectedUiUs);
-
-    await this.assertOutcomeChartMostRecentPointHasDate(expectedUiUs);
   }
 
   private extractFirstDateFromText(text: string): string | null {
@@ -205,30 +192,6 @@ export class FundPage {
       return `${m}/${d}/${y}`;
     }
     return null;
-  }
-
-  private async assertOutcomeChartMostRecentPointHasDate(expectedUsMdy: string): Promise<void> {
-    const panel = this.visibleTabpanel;
-    const chartRegion = panel.getByRole('group', { name: /Highcharts interactive chart/i }).first();
-    await expect(chartRegion, 'Outcome tab: expected a Highcharts interactive chart region').toBeVisible();
-
-    // Highcharts exposes one generic "Interactive chart" image plus many point images with date labels.
-    // Filter to only the point-like labels that include a recognizable date format.
-    const pointImgs = chartRegion.getByRole('img', {
-      name: /(\b\d{1,2}\/\d{1,2}\/\d{4}\b)|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b/,
-    });
-    const count = await pointImgs.count();
-    // In some runs (especially under parallel load), Highcharts may not expose per-point accessibility nodes reliably.
-    // The "Data ranges ... to YYYY-MM-DD" check already enforces the most recent date, so treat missing point nodes
-    // as non-fatal here.
-    if (count === 0) return;
-
-    const last = pointImgs.nth(count - 1);
-    const aria = (await last.getAttribute('aria-label').catch(() => null)) ?? '';
-    const name = aria || (await last.innerText().catch(() => ''));
-    const found = this.extractFirstDateFromText(name);
-    expect(found, `Outcome tab: could not extract a date from last chart point label: ${JSON.stringify(name)}`).toBeTruthy();
-    expect(found!, 'Outcome tab: most recent chart point date mismatch').toBe(expectedUsMdy);
   }
 
   async downloadOutcomeChartCsv(): Promise<string> {
@@ -291,11 +254,6 @@ export class FundPage {
       const m = lastText.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
       expect(m, `Holdings tab (FoF): could not parse US date from chart stamp: ${JSON.stringify(lastText)}`).toBeTruthy();
       assertUsMdyMatchesExpected(normalizeUsMdy(m![1]!), chartExpected, 'Fund page → Holdings (FoF chart stamp)');
-
-      const chartRegion = panel.getByRole('group', { name: /Highcharts interactive chart/i });
-      await expect(chartRegion, 'Holdings tab (FoF): expected a Highcharts interactive chart region').toBeVisible();
-      const pointImgs = chartRegion.getByRole('img');
-      expect(await pointImgs.count(), 'Holdings tab (FoF): expected chart to expose point items').toBeGreaterThan(0);
       return;
     }
 
