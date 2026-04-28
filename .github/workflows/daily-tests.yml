@@ -2,9 +2,8 @@ name: Daily Playwright tests
 
 on:
   schedule:
-    # TEMP: every 10 minutes to verify schedule triggers.
-    # Once we see `schedule` runs firing, we’ll switch back to the desired daily time.
-    - cron: "*/10 * * * *"
+    - cron: "27 11 * * *"
+    - cron: "27 12 * * *"
   workflow_dispatch: {}
 
 jobs:
