@@ -1,9 +1,6 @@
 name: Daily Playwright tests
 
 on:
-  schedule:
-    - cron: "27 11 * * *"
-    - cron: "27 12 * * *"
   workflow_dispatch: {}
 
 jobs:
