@@ -50,16 +50,19 @@ function parsePlaywrightSummary(raw) {
   let passed = null;
   let failed = null;
   let skipped = null;
+  let flaky = null;
   let duration = null;
 
   for (const l of lines) {
     const mPassed = l.match(/\b(\d+)\s+passed\b/i);
     const mFailed = l.match(/\b(\d+)\s+failed\b/i);
     const mSkipped = l.match(/\b(\d+)\s+skipped\b/i);
+    const mFlaky = l.match(/\b(\d+)\s+flaky\b/i);
     const mDur = l.match(/\(([\d.]+[sm]|[\d.]+m)\)\s*$/i);
     if (mPassed) passed = Number(mPassed[1]);
     if (mFailed) failed = Number(mFailed[1]);
     if (mSkipped) skipped = Number(mSkipped[1]);
+    if (mFlaky) flaky = Number(mFlaky[1]);
     if (mDur) duration = mDur[1];
   }
 
@@ -84,7 +87,7 @@ function parsePlaywrightSummary(raw) {
     uniqueFailures.push(f);
   }
 
-  return { passed, failed, skipped, duration, failures: uniqueFailures };
+  return { passed, failed, skipped, flaky, duration, failures: uniqueFailures };
 }
 
 function extractFailedTestDetails(raw) {
@@ -151,6 +154,7 @@ const mailTo = requiredEnv('MAIL_TO');
 const mailFrom = process.env.MAIL_FROM ?? smtpUser;
 
 const testStatus = process.env.TEST_STATUS ?? 'unknown';
+const flakyCountFromEnv = Number(process.env.FLAKY_COUNT ?? '0') || 0;
 const runUrl = githubRunUrl();
 
 const summary =
@@ -165,10 +169,13 @@ const subject = `${subjectPrefix} ${testStatus.toUpperCase()} - ${process.env.GI
 const parsed = summary ? parsePlaywrightSummary(summary) : null;
 const failedDetails = summary ? extractFailedTestDetails(summary) : [];
 
+const flakyCount = Math.max(flakyCountFromEnv, parsed?.flaky ?? 0);
+
 const headlineParts = [
   parsed?.passed != null ? `${parsed.passed} passed` : null,
   parsed?.failed != null ? `${parsed.failed} failed` : null,
   parsed?.skipped != null ? `${parsed.skipped} skipped` : null,
+  flakyCount > 0 ? `${flakyCount} retried/flaky` : null,
   parsed?.duration ? `in ${parsed.duration}` : null,
 ].filter(Boolean);
 
@@ -181,9 +188,10 @@ const bodyLines = [
   '- Playwright HTML report is uploaded as workflow artifact: "playwright-report"',
   '- Trace/video/screenshots are under artifact folder: "test-results"',
   '',
-  failedDetails.length ? 'Raw output:' : null,
+  testStatus !== 'passed' && failedDetails.length ? 'Raw output:' : null,
   ...(failedDetails.length
-    ? failedDetails.flatMap((t) => [
+    ? testStatus !== 'passed'
+      ? failedDetails.flatMap((t) => [
         `${t.index}) ${t.name}`,
         t.error ? `  Error: ${t.error}` : '  Error: (not found)',
         t.reason ? `    Reason: ${t.reason}` : '    Reason: (not found)',
@@ -191,6 +199,7 @@ const bodyLines = [
         t.expected ? `    Expected: ${t.expected}` : '    Expected: (not found)',
         '',
       ])
+      : []
     : []),
 ].filter((x) => x !== null);
 
@@ -205,7 +214,7 @@ const html = `
       <li>Traces/videos/screenshots artifact folder: <code>test-results</code></li>
     </ul>
     ${
-      failedDetails.length
+      testStatus !== 'passed' && failedDetails.length
         ? `<h3 style="margin: 16px 0 8px 0;">Raw output</h3>
            ${failedDetails
              .map(

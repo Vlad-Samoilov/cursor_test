@@ -31,6 +31,22 @@ jobs:
           mkdir -p playwright-report test-results
           npm test 2>&1 | tee playwright-summary.txt
 
+      - name: Detect retries / flaky tests
+        id: flake
+        if: always()
+        run: |
+          set -euo pipefail
+          flaky=0
+          # Playwright often prints either "N flaky" or "Retry #N" markers.
+          if [ -f playwright-summary.txt ]; then
+            if grep -Eiq '\b[0-9]+\s+flaky\b' playwright-summary.txt; then
+              flaky="$(grep -Eio '\b[0-9]+\s+flaky\b' playwright-summary.txt | head -n 1 | grep -Eo '[0-9]+' || echo 1)"
+            elif grep -Eiq 'Retry #\d+' playwright-summary.txt; then
+              flaky=1
+            fi
+          fi
+          echo "flaky_count=$flaky" >> "$GITHUB_OUTPUT"
+
       - name: Determine status
         id: status
         run: |
@@ -55,6 +71,7 @@ jobs:
         if: always()
         env:
           TEST_STATUS: ${{ steps.status.outputs.status }}
+          FLAKY_COUNT: ${{ steps.flake.outputs.flaky_count }}
           SMTP_HOST: smtp.gmail.com
           SMTP_PORT: "587"
           SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
