@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/test';
 import { ALL_TICKERS, NON_FOF_TICKERS, PERFORMANCE_SKIP_TICKERS, TICKERS_FOF } from './fixtures/tickers';
 import {
   assertAsOfIsPreviousWorkingDayET,

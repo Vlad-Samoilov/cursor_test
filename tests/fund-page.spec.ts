@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/test';
 import { FUND_PAGE_STRATEGIES, pickRandomTicker } from './fixtures/fund-page-samples';
 import { FundPage } from './po/fund-page.po';
 import { ProductTablePage } from './po/product-table.po';

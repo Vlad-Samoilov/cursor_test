@@ -42,7 +42,9 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('')`. */
     baseURL: 'https://www.allianzim.com',
 
-    screenshot: 'only-on-failure',
+    // We attach our own full-page screenshot on failure via `tests/fixtures/test.ts`.
+    // Turn off Playwright's default (viewport) screenshots to avoid duplicates.
+    screenshot: 'off',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
   },
