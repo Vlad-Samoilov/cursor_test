@@ -517,9 +517,11 @@ const { hardFailed: hardFailedDetails, flakyFailed: flakyFailedDetails } = parti
   { jobPassed, flakyCount },
 );
 
-const passedN = parsed?.passed ?? '—';
-const failedN = parsed?.failed ?? '—';
-const flakyN = String(flakyCount);
+/** Display strings for stats (Outlook-friendly; avoid "—" for failed when run passed but summary omits "0 failed"). */
+const passedDisplay = parsed?.passed != null ? String(parsed.passed) : '—';
+const failedDisplay =
+  parsed?.failed != null ? String(parsed.failed) : jobPassed && parsed?.passed != null ? '0' : '—';
+const flakyDisplay = String(flakyCount);
 const durationLine = parsed?.duration ? `Playwright reported duration: ${parsed.duration}` : 'Duration: —';
 
 const brand = '#003781';
@@ -550,9 +552,9 @@ const bodyLines = [
   `${subjectPrefix} ${statusLabel}`,
   '',
   'Results',
-  `  Passed — ${passedN}`,
-  `  Failed — ${failedN}`,
-  `  Retried / flaky — ${flakyN}`,
+  `  Passed — ${passedDisplay}`,
+  `  Failed — ${failedDisplay}`,
+  `  Retried / flaky — ${flakyDisplay}`,
   `  Time of run — ${runTimeDisplay}`,
   '',
   runUrl ? `GitHub run (full log): ${runUrl}` : null,
@@ -634,13 +636,13 @@ const statsTable = `
       <td style="width:50%;padding:6px;">
         <div style="background:#ecf9f0;border-radius:10px;padding:14px 16px;border:1px solid #b8e0c8;">
           <div style="font-size:12px;color:#1e6b3a;font-weight:600;">Passed</div>
-          <div style="font-size:28px;font-weight:800;color:#14532d;">${escapeHtml(String(passedN))}</div>
+          <div style="font-size:28px;font-weight:800;color:#14532d;">${escapeHtml(passedDisplay)}</div>
         </div>
       </td>
       <td style="width:50%;padding:6px;">
         <div style="background:#fdeeee;border-radius:10px;padding:14px 16px;border:1px solid #f5c2c2;">
           <div style="font-size:12px;color:#9b1c1c;font-weight:600;">Failed</div>
-          <div style="font-size:28px;font-weight:800;color:#7f1d1d;">${escapeHtml(String(failedN))}</div>
+          <div style="font-size:28px;font-weight:800;color:#7f1d1d;">${escapeHtml(failedDisplay)}</div>
         </div>
       </td>
     </tr>
@@ -648,7 +650,7 @@ const statsTable = `
       <td style="padding:6px;">
         <div style="background:#fff8e6;border-radius:10px;padding:14px 16px;border:1px solid #f5e0a8;">
           <div style="font-size:12px;color:#8a6d1b;font-weight:600;">Retried / flaky</div>
-          <div style="font-size:28px;font-weight:800;color:#6b560f;">${escapeHtml(String(flakyN))}</div>
+          <div style="font-size:28px;font-weight:800;color:#6b560f;">${escapeHtml(flakyDisplay)}</div>
         </div>
       </td>
       <td style="padding:6px;">
@@ -662,23 +664,21 @@ const statsTable = `
   </table>
 `;
 
-const heroBg =
-  testStatus === 'passed'
-    ? 'linear-gradient(135deg, #0d6b4a 0%, #12a06f 55%, #0f7a58 100%)'
-    : 'linear-gradient(135deg, #6b0d1a 0%, #c41e3a 45%, #8b1538 100%)';
+/** Solid fills only: Outlook/Word HTML often strips CSS gradients, which left white text on a pale background. */
+const heroBgColor = jobPassed ? '#0d5c44' : '#8b1538';
 
 const html = `
 <!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:#f0f4f8;">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f0f4f8;padding:20px 12px;">
+<html><body style="margin:0;padding:0;background-color:#f0f4f8;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" bgcolor="#f0f4f8" style="background-color:#f0f4f8;padding:20px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;border-collapse:separate;">
           <tr>
-            <td style="border-radius:14px 14px 0 0;background:${heroBg};padding:22px 24px;color:#fff;">
-              <div style="font-size:13px;opacity:0.92;letter-spacing:0.04em;">${escapeHtml(subjectPrefix)}</div>
-              <div style="font-size:30px;font-weight:800;margin-top:6px;line-height:1.15;">${escapeHtml(statusLabel)}</div>
-              <div style="font-size:14px;margin-top:10px;opacity:0.95;">Automated end-to-end checks against the public site.</div>
+            <td bgcolor="${heroBgColor}" style="border-radius:14px 14px 0 0;background-color:${heroBgColor};padding:22px 24px;">
+              <div style="font-size:13px;color:#ecfdf5;letter-spacing:0.04em;mso-line-height-rule:exactly;line-height:1.35;">${escapeHtml(subjectPrefix)}</div>
+              <div style="font-size:30px;font-weight:800;color:#ffffff;margin-top:6px;line-height:1.15;mso-line-height-rule:exactly;">${escapeHtml(statusLabel)}</div>
+              <div style="font-size:14px;color:#d1fae5;margin-top:10px;line-height:1.4;mso-line-height-rule:exactly;">Automated end-to-end checks against the public site.</div>
             </td>
           </tr>
           <tr>
