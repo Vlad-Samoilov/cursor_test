@@ -94,6 +94,27 @@ export function lastDayOfPreviousMonthET_usMdy(): string {
   });
 }
 
+/** Last calendar day of the month **two months before** today’s calendar month in America/New_York (Luxon). */
+export function lastDayOfTwoMonthsPriorMonthET_usMdy(): string {
+  const end = DateTime.now().setZone(NY_TZ).minus({ months: 2 }).endOf('month');
+  return `${end.month}/${end.day}/${end.year}`;
+}
+
+/**
+ * Performance data rolls on the **1st** of each ET calendar month at **09:30 ET**.
+ * - Any day except the 1st: expect last day of the **previous** calendar month.
+ * - On the 1st **before** 09:30 ET: expect last day of the month **two months** before the current month.
+ * - On the 1st **at or after** 09:30 ET: expect last day of the **previous** calendar month.
+ */
+export function performanceExpectedPriorMonthEndSnapshotET_usMdy(): string {
+  const now = DateTime.now().setZone(NY_TZ);
+  if (now.day === 1) {
+    const minutes = now.hour * 60 + now.minute;
+    if (minutes < 9 * 60 + 30) return lastDayOfTwoMonthsPriorMonthET_usMdy();
+  }
+  return lastDayOfPreviousMonthET_usMdy();
+}
+
 /** Canonical `M/D/YYYY` (no leading zeros) for stable equality checks. */
 export function normalizeUsMdy(usMdy: string): string {
   const m = usMdy.trim().match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
@@ -190,7 +211,10 @@ export const expectedAsOf = {
       return this.characteristicsUi();
     },
     performanceUi(): ExpectedUsMdy {
-      return expectedUsMdyExact(lastDayOfPreviousMonthET_usMdy(), 'Performance uses prior month-end snapshot.');
+      return expectedUsMdyExact(
+        performanceExpectedPriorMonthEndSnapshotET_usMdy(),
+        'Performance uses prior month-end snapshot; on the 1st ET before 09:30, prior snapshot has not rolled yet.',
+      );
     },
   },
   fund: {
@@ -221,7 +245,10 @@ export const expectedAsOf = {
         : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'Before 09:50 ET, FoF holdings chart stamp is previous working day.');
     },
     performanceUi(): ExpectedUsMdy {
-      return expectedUsMdyExact(lastDayOfPreviousMonthET_usMdy(), 'Performance uses prior month-end snapshot.');
+      return expectedUsMdyExact(
+        performanceExpectedPriorMonthEndSnapshotET_usMdy(),
+        'Performance uses prior month-end snapshot; on the 1st ET before 09:30, prior snapshot has not rolled yet.',
+      );
     },
     // Chart CSV rule remains "previous working day row exists" (not an as-of match).
   },
@@ -283,17 +310,17 @@ export function assertAsOfIsPreviousWorkingDayOrTodayET(usMdy: string): void {
   }
 }
 
-/** Performance tab uses month-end snapshot: last calendar day of the prior month (ET calendar month boundaries). */
+/** Performance tab month-end snapshot (respects 09:30 ET roll on the 1st). */
 export function assertAsOfIsLastDayOfPriorMonthET(usMdy: string): void {
-  const expected = lastDayOfPreviousMonthET_usMdy();
+  const expected = performanceExpectedPriorMonthEndSnapshotET_usMdy();
   const actual = normalizeUsMdy(usMdy);
   if (actual !== expected) {
     throw new Error(
       [
-        '"Data as of" on the Performance tab should be the last day of the previous calendar month (Eastern Time month boundaries).',
+        '"Data as of" on the Performance tab should match the expected month-end snapshot (America/New_York; rolls at 09:30 ET on the 1st).',
         '',
         `Shown on site: ${actual}`,
-        `Expected (last day of previous month): ${expected}`,
+        `Expected: ${expected}`,
       ].join('\n'),
     );
   }

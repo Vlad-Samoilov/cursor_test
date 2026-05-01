@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import {
   assertUsMdyMatchesExpected,
   expectedAsOf,
-  lastDayOfPreviousMonthET_usMdy,
   normalizeUsMdy,
   previousWorkingDayET_usMdy,
   previousWorkingDayET_usMdy_n,
@@ -272,11 +271,11 @@ export class FundPage {
 
     const asOf = text.match(/\bAs of\s+(\d{1,2}\/\d{1,2}\/\d{4})\b/i);
     if (asOf?.[1]) {
-      const expected = lastDayOfPreviousMonthET_usMdy();
-      expect(
-        asOf[1].trim(),
-        `Performance tab: when an "As of" date is shown, it should match prior month-end ${expected}`,
-      ).toBe(expected);
+      assertUsMdyMatchesExpected(
+        normalizeUsMdy(asOf[1]),
+        expectedAsOf.fund.performanceUi(),
+        'Fund page → Performance (UI)',
+      );
     }
 
     await this.assertAllDataTablesFilled(panel, 'Performance tab');
