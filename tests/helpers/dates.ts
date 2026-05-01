@@ -153,7 +153,16 @@ export function expectedUsMdyOneOf(dates: string[], reason?: string): ExpectedUs
   return { mode: 'one_of', dates: dates.map(normalizeUsMdy), reason };
 }
 
-export function assertUsMdyMatchesExpected(actualUsMdy: string, expected: ExpectedUsMdy, context: string): void {
+/** Whether the value came from the browser UI or from a downloaded/parsed CSV file. */
+export type AsOfAssertionSource = 'ui' | 'csv';
+
+export function assertUsMdyMatchesExpected(
+  actualUsMdy: string,
+  expected: ExpectedUsMdy,
+  context: string,
+  source: AsOfAssertionSource = 'ui',
+): void {
+  const shownLine = source === 'csv' ? `Shown on CSV: ${normalizeUsMdy(actualUsMdy)}` : `Shown on site: ${normalizeUsMdy(actualUsMdy)}`;
   const actual = normalizeUsMdy(actualUsMdy);
   if (expected.mode === 'exact') {
     if (actual !== expected.date) {
@@ -162,7 +171,7 @@ export function assertUsMdyMatchesExpected(actualUsMdy: string, expected: Expect
           `${context}: as-of date mismatch (America/New_York).`,
           expected.reason ? `Reason: ${expected.reason}` : '',
           '',
-          `Shown on site or CSV: ${actual}`,
+          shownLine,
           `Expected: ${expected.date}`,
         ]
           .filter(Boolean)
@@ -178,11 +187,11 @@ export function assertUsMdyMatchesExpected(actualUsMdy: string, expected: Expect
         `${context}: as-of date mismatch (America/New_York).`,
         expected.reason ? `Reason: ${expected.reason}` : '',
         '',
-        `Shown on site or CSV: ${actual}`,
+        shownLine,
         `Expected one of: ${expected.dates.join(', ')}`,
       ]
         .filter(Boolean)
-        .join('\n'),
+          .join('\n'),
     );
   }
 }

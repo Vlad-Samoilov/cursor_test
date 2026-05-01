@@ -106,6 +106,7 @@ test.describe('Product table @smoke', () => {
         parsed.asOfDate,
         expectedAsOf.productTable.characteristicsCsv(),
         'Product Table → Characteristics (CSV)',
+        'csv',
       );
     });
 

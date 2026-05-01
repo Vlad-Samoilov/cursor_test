@@ -1,4 +1,4 @@
-name: Daily Playwright tests
+name: Allianz smoke daily tests
 
 on:
   workflow_dispatch: {}
@@ -56,6 +56,11 @@ jobs:
             echo "status=failed" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Run timestamp for email
+        id: run_time
+        if: always()
+        run: echo "iso=$(date -u +'%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,12 +77,14 @@ jobs:
         env:
           TEST_STATUS: ${{ steps.status.outputs.status }}
           FLAKY_COUNT: ${{ steps.flake.outputs.flaky_count }}
+          RUN_DISPLAY_TIME: ${{ steps.run_time.outputs.iso }}
+          ARTIFACTS_PAGE_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
           SMTP_HOST: smtp.gmail.com
           SMTP_PORT: "587"
           SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
           SMTP_PASS: ${{ secrets.GMAIL_SMTP_PASS }}
           MAIL_TO: vladislav.samoylov@dataart.com
-          SUBJECT_PREFIX: "[Daily Playwright]"
+          SUBJECT_PREFIX: "[Allianz smoke daily tests]"
         run: node scripts/send-smtp-report.mjs
 
       - name: Fail job if tests failed
