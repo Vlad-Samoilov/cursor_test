@@ -1,0 +1,30 @@
+---
+description: Keep code comments/JSDoc accurate when code changes
+alwaysApply: true
+---
+
+# Commenting & JSDoc Rule
+
+When you **add or change code**, you must **add/update comments** so they stay correct.
+
+- **Prefer docblocks over inline comments**:
+  - TypeScript/JS: use **JSDoc** `/** ... */` for every new/changed function, method, class, exported type, and any non-trivial private helper.
+  - Keep docblocks **intent/contract focused**: what it does, why it exists, constraints, side effects, invariants, failure modes.
+- **Inline `//` comments only when needed**:
+  - Use them for **non-obvious logic** (DOM quirks, flaky behavior workarounds, regex parsing, timezones/business rules).
+  - Avoid line-by-line narration of obvious code.
+- **Update comments when behavior changes**:
+  - If code changes meaning/assumptions, update the comment in the same edit.
+  - If you can’t keep an existing comment accurate, **remove or rewrite it**.
+
+## Examples (TypeScript)
+
+```ts
+/** Downloads the CSV export and returns the local temp file path Playwright saved. */
+async downloadTableCsv(): Promise<string> { /* ... */ }
+```
+
+```ts
+// Tabs can leave non-visible duplicates in the DOM; only use a visible label.
+const candidates = page.getByText(/Data as of\\s+\\d{1,2}\\/\\d{1,2}\\/\\d{4}/);
+```
