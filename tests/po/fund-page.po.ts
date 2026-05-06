@@ -170,52 +170,6 @@ export class FundPage {
   }
 
   /**
-   * Attempts to parse the first date-like token from free-form UI text.
-   *
-   * Supported formats (first match wins):
-   * - US: `M/D/YYYY`
-   * - named months (common in Highcharts accessibility text): `Apr 21, 2026`
-   * - ISO: `YYYY-MM-DD`
-   */
-  private extractFirstDateFromText(text: string): string | null {
-    const us = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
-    if (us?.[1]) return normalizeUsMdy(us[1]);
-
-    // Highcharts accessibility labels often look like: "Tuesday, Apr 21, 2026, …"
-    const named = text.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),\s+(\d{4})\b/);
-    if (named) {
-      const mon = named[1];
-      const day = Number(named[2]);
-      const year = Number(named[3]);
-      const monthMap: Record<string, number> = {
-        Jan: 1,
-        Feb: 2,
-        Mar: 3,
-        Apr: 4,
-        May: 5,
-        Jun: 6,
-        Jul: 7,
-        Aug: 8,
-        Sep: 9,
-        Oct: 10,
-        Nov: 11,
-        Dec: 12,
-      };
-      const m = monthMap[mon];
-      if (m) return `${m}/${day}/${year}`;
-    }
-
-    const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (iso) {
-      const y = Number(iso[1]);
-      const m = Number(iso[2]);
-      const d = Number(iso[3]);
-      return `${m}/${d}/${y}`;
-    }
-    return null;
-  }
-
-  /**
    * Clicks the "Download chart data (CSV)" link and returns the local temp file path.
    *
    * The caller is responsible for reading and deleting the temp file if needed.

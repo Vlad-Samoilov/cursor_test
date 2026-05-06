@@ -8,5 +8,8 @@ node_modules/
 /playwright/.auth/
 .playwright-mcp/
 
+# Local tooling scratch
+/ts-files.txt
+
 # Local-only documentation / compliance-sensitive artifacts (NOT committed)
 /docs-local/

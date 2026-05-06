@@ -42,16 +42,6 @@ export function analyzeTickerSets(actual: string[], expected: readonly string[])
   };
 }
 
-/** Plain-language explanation for terminal + HTML report. */
-export function formatTickerMismatchBrief(m: TickerMismatch): string {
-  const parts: string[] = [];
-  parts.push(`Rows in table: ${m.actualRowCount}. Unique tickers: ${m.uniqueCount}. Expected symbols: ${m.expectedCount}.`);
-  if (m.hasDuplicateRows) parts.push('Duplicate ticker rows detected.');
-  if (m.missing.length) parts.push(`Missing (${m.missing.length}): ${m.missing.join(', ')}.`);
-  if (m.extra.length) parts.push(`Unexpected (${m.extra.length}): ${m.extra.join(', ')}.`);
-  return parts.join(' ');
-}
-
 /**
  * Asserts that the table's ticker column matches the expected allowlist exactly.
  *

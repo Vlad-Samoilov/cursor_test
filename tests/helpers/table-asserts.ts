@@ -1,8 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
 
-export type EmptyCellFinding = { row: number; col: number; raw: string; rowKey?: string };
-
 /**
  * Asserts that a table's `<tbody>` contains no visually-empty `th`/`td` cells.
  *
