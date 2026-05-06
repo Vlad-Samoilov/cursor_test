@@ -1,16 +1,28 @@
 import Holidays from 'date-holidays';
 import { DateTime } from 'luxon';
 
+/** IANA timezone identifier used for "ET" expectations in tests. */
 const NY_TZ = 'America/New_York';
 
+/** US holiday calendar used to decide whether a working day is "open". */
 const hd = new Holidays('US');
 
+/**
+ * Returns today's calendar date parts in America/New_York.
+ *
+ * Uses `en-CA` formatting to get a stable `YYYY-MM-DD` string, then parses it.
+ */
 function todayPartsET(): { y: number; m: number; d: number } {
   const s = new Date().toLocaleDateString('en-CA', { timeZone: NY_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
   const [y, m, d] = s.split('-').map(Number);
   return { y, m, d };
 }
 
+/**
+ * Returns whether it is currently Saturday/Sunday in New York time.
+ *
+ * Used to widen expectations in places where data can lag over weekends.
+ */
 function isWeekendET(): boolean {
   const now = DateTime.now().setZone(NY_TZ);
   return now.weekday === 6 || now.weekday === 7;
@@ -21,8 +33,19 @@ export function formatUsMdy(parts: { y: number; m: number; d: number }): string 
   return `${parts.m}/${parts.d}/${parts.y}`;
 }
 
+/**
+ * Minimal subset of the `date-holidays` holiday record we care about.
+ *
+ * The library can return a single rule or a list of rules for a given date.
+ */
 type HolidayRule = { type?: string; name?: string };
 
+/**
+ * Returns whether a holiday rule should be treated as closing the working day.
+ *
+ * We only consider `public` and `bank` days as closures and intentionally ignore
+ * observance-only events like Easter for these checks.
+ */
 function holidayClosesWorkingDay(rule: HolidayRule): boolean {
   const t = rule.type ?? '';
   if (t !== 'public' && t !== 'bank') return false;
@@ -145,10 +168,12 @@ export type ExpectedUsMdy =
   | { mode: 'exact'; date: string; reason?: string }
   | { mode: 'one_of'; dates: string[]; reason?: string };
 
+/** Builds an expectation for an exact US date \(normalized to `M/D/YYYY`\). */
 export function expectedUsMdyExact(date: string, reason?: string): ExpectedUsMdy {
   return { mode: 'exact', date: normalizeUsMdy(date), reason };
 }
 
+/** Builds an expectation that accepts any of the provided dates \(normalized to `M/D/YYYY`\). */
 export function expectedUsMdyOneOf(dates: string[], reason?: string): ExpectedUsMdy {
   return { mode: 'one_of', dates: dates.map(normalizeUsMdy), reason };
 }
@@ -156,6 +181,11 @@ export function expectedUsMdyOneOf(dates: string[], reason?: string): ExpectedUs
 /** Whether the value came from the browser UI or from a downloaded/parsed CSV file. */
 export type AsOfAssertionSource = 'ui' | 'csv';
 
+/**
+ * Asserts that an "as of" date matches the expected value(s), with a helpful error message.
+ *
+ * `source` controls whether the message says "site" or "CSV" but uses the same normalization rules.
+ */
 export function assertUsMdyMatchesExpected(
   actualUsMdy: string,
   expected: ExpectedUsMdy,
@@ -196,6 +226,14 @@ export function assertUsMdyMatchesExpected(
   }
 }
 
+/**
+ * Centralized business rules for "as of" expectations across different pages/views.
+ *
+ * These are intentionally time-dependent in America/New_York and account for:
+ * - weekend tolerance where feeds can lag
+ * - intraday publish windows (some views roll to "today" after a time cutoff)
+ * - performance month-end snapshot behavior
+ */
 export const expectedAsOf = {
   productTable: {
     overviewFeesUi(): ExpectedUsMdy {

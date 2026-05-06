@@ -9,10 +9,22 @@ import { assertTickerColumnMatches } from './helpers/assert-tickers';
 import { parseCharacteristicsCsvDownload } from './helpers/characteristics-csv';
 import { ProductTablePage } from './po/product-table.po';
 
+/**
+ * Smoke tests for the "Product Table" page.
+ *
+ * These checks validate:
+ * - the product universe (tickers) matches the expected allowlist
+ * - tables do not render blank data cells
+ * - "Data as of" behavior follows ET business rules
+ * - core interactions (filters/sorting) are functional
+ */
 test.describe('Product table @smoke', () => {
   /* Not using mode: 'serial' — in serial mode Playwright skips the rest of the group after one failure. */
   test.describe.configure({ timeout: 120_000 });
 
+  /**
+   * Overview & Fees is expected to list the entire product universe and show previous working-day stamps.
+   */
   test('1. Overview & Fees — tickers, no blank cells, as-of matches prior US working day (ET)', async ({ page }) => {
     await test.step('Open Product Table → Overview & Fees', async () => {
       const pt = new ProductTablePage(page);
@@ -41,6 +53,9 @@ test.describe('Product table @smoke', () => {
     });
   });
 
+  /**
+   * Characteristics excludes FoF tickers and follows intraday publish-window rules for as-of stamps.
+   */
   test('2. Characteristics — FoF excluded; other tickers; no blank cells; as-of prior US working day (ET)', async ({
     page,
   }) => {
@@ -77,6 +92,11 @@ test.describe('Product table @smoke', () => {
     });
   });
 
+  /**
+   * Validates that the Characteristics CSV export is consistent with the on-screen view.
+   *
+   * The export is also checked against the same as-of business rules as the UI.
+   */
   test('3. Characteristics — CSV matches screen; FoF excluded; as-of is previous U.S. working day', async ({ page }) => {
     await test.step('Open Product Table → Characteristics', async () => {
       const pt = new ProductTablePage(page);
@@ -125,6 +145,9 @@ test.describe('Product table @smoke', () => {
     });
   });
 
+  /**
+   * Performance tab uses a month-end snapshot that rolls at 09:30 ET on the 1st.
+   */
   test('4. Performance — all tickers; no blank cells; as-of last day of prior month (ET)', async ({ page }) => {
     await test.step('Open Product Table → Performance', async () => {
       const pt = new ProductTablePage(page);
@@ -153,6 +176,9 @@ test.describe('Product table @smoke', () => {
     });
   });
 
+  /**
+   * Documents tab is validated primarily as a "universe completeness" check.
+   */
   test('5. Documents — all tickers in Ticker column', async ({ page }) => {
     await test.step('Open Product Table → Documents', async () => {
       const pt = new ProductTablePage(page);
@@ -167,6 +193,12 @@ test.describe('Product table @smoke', () => {
     });
   });
 
+  /**
+   * Exercises the filter sidebar as an interaction smoke test.
+   *
+   * The test uses a stable allowlist of filter names instead of discovery because the site's
+   * accessible names can be inconsistent under load.
+   */
   test('6. Filters + Clear filters — random filters change results and restore baseline', async ({ page }, testInfo) => {
     testInfo.setTimeout(120_000);
     const pt = new ProductTablePage(page);
@@ -244,6 +276,11 @@ test.describe('Product table @smoke', () => {
     expect(restored.join(','), 'clear filters should restore the baseline set').toBe(baseline.join(','));
   });
 
+  /**
+   * Exercises sortable headers as an interaction smoke test.
+   *
+   * We don't rely on `aria-sort` being present; instead we click and assert that visible order changes.
+   */
   test('7. Sorting — random column random asc/desc changes visible order', async ({ page }, testInfo) => {
     const pt = new ProductTablePage(page);
     await pt.goto();
@@ -274,6 +311,11 @@ test.describe('Product table @smoke', () => {
   });
 });
 
+/**
+ * Small deterministic RNG for test reproducibility.
+ *
+ * When combined with `SMOKE_SEED` and `workerIndex`, this makes "random" test actions debuggable.
+ */
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0;
   return () => {
@@ -284,6 +326,9 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Picks a random subset without replacement using a Fisher–Yates shuffle.
+ */
 function pickRandomSubset<T>(arr: T[], count: number, rng: () => number): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -293,6 +338,7 @@ function pickRandomSubset<T>(arr: T[], count: number, rng: () => number): T[] {
   return copy.slice(0, count);
 }
 
+/** Escapes a string so it can be safely embedded into a RegExp pattern. */
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

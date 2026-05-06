@@ -9,8 +9,11 @@ import {
 
 /** Strategy row for fund-page tests — ticker is picked at random from `pool` when each test runs. */
 export type FundPageStrategyDefinition = {
+  /** Human-readable strategy name used in test titles/logs. */
   strategy: string;
+  /** Ticker pool used for random sampling. */
   pool: readonly string[];
+  /** Whether the fund page is expected to expose the Outcome period details tab. */
   hasOutcomePeriodTab: boolean;
 };
 

@@ -22,17 +22,38 @@ export function splitCsvLine(line: string): string[] {
   return out;
 }
 
+/**
+ * Parsed output of the "Characteristics" CSV export.
+ *
+ * `asOfDate` is expected to be in US format \(M/D/YYYY\).
+ */
 export type ParsedCharacteristicsCsv = {
+  /** "As of date" column value captured from the first data row that provides it. */
   asOfDate: string;
+  /** Ticker symbols parsed from the `Ticker_Start Date` column. */
   tickers: string[];
 };
 
+/**
+ * Extracts a ticker symbol from a combined `Ticker_Start Date` column cell.
+ *
+ * This export's format varies; we accept either:
+ * - `TICKER_...` and take the prefix before `_`
+ * - a fixed-width ticker-like prefix (first 4 chars) as fallback
+ */
 function tickerFromTickerStartColumn(value: string): string {
   const v = value.trim();
   if (!v) return '';
   return v.includes('_') ? v.split('_')[0]!.trim() : v.slice(0, 4).trim();
 }
 
+/**
+ * Parses the downloaded Characteristics CSV file.
+ *
+ * The parser is intentionally strict about required columns to catch export regressions early.
+ *
+ * @throws if required columns are missing or the as-of date doesn't look like `M/D/YYYY`
+ */
 export function parseCharacteristicsCsvDownload(filePath: string): ParsedCharacteristicsCsv {
   let raw = fs.readFileSync(filePath, 'utf-8');
   raw = raw.replace(/^\uFEFF/, '');

@@ -12,6 +12,7 @@ import { defineConfig, devices } from '@playwright/test';
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
+  /** Root directory where Playwright looks for test files. */
   testDir: './tests',
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -53,6 +54,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      /** Baseline desktop profile used for these smoke checks. */
       use: { ...devices['Desktop Chrome'] },
     },
 

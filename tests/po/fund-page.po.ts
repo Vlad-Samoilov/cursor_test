@@ -13,13 +13,24 @@ import { PERFORMANCE_SKIP_TICKERS, TICKERS_FOF } from '../fixtures/tickers';
 import { splitCsvLine } from '../helpers/characteristics-csv';
 import { DateTime } from 'luxon';
 
+/** IANA timezone identifier used for "ET" expectations in tests. */
 const NY_TZ = 'America/New_York';
 
+/**
+ * Returns whether it is currently Saturday/Sunday in New York time.
+ *
+ * Used to widen expected date matching for exports that may lag over the weekend.
+ */
 function isWeekendET(): boolean {
   const now = DateTime.now().setZone(NY_TZ);
   return now.weekday === 6 || now.weekday === 7;
 }
 
+/**
+ * Tabs available on the Fund page.
+ *
+ * Note: strings are matched against tab accessible names (case-insensitive).
+ */
 export type FundTab =
   | 'Outcome period details'
   | 'Holdings'
@@ -27,14 +38,34 @@ export type FundTab =
   | 'Overview'
   | 'Documents';
 
+/**
+ * Page Object for an ETF "Fund" detail page.
+ *
+ * Responsibilities:
+ * - switch between fund tabs and wait for the active panel
+ * - validate “as of”/“data from” date stamps against expected business rules
+ * - validate that tables contain filled cells
+ * - download and validate CSV exports (chart/table)
+ */
 export class FundPage {
+  /** Creates a page object bound to the provided Playwright `Page`. */
   constructor(readonly page: Page) {}
 
+  /**
+   * Extracts the first US-style date \(M/D/YYYY\) found in a string and normalizes it.
+   *
+   * Returns `null` when no US date is present.
+   */
   private extractUsMdyFromText(text: string): string | null {
     const m = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
     return m?.[1] ? normalizeUsMdy(m[1]) : null;
   }
 
+  /**
+   * Reads the first visible "Data as of M/D/YYYY" label within a panel and returns the date.
+   *
+   * We explicitly check visibility because the DOM can contain stale stamps from other tabs/panels.
+   */
   private async readPanelDataAsOfUsDate(panel: Locator): Promise<string> {
     const candidates = panel.getByText(/Data as of\s+\d{1,2}\/\d{1,2}\/\d{4}/i);
     const n = await candidates.count();
@@ -50,12 +81,22 @@ export class FundPage {
     throw new Error('could not find a visible "Data as of MM/DD/YYYY" label in the active panel');
   }
 
+  /**
+   * Returns the sidebar section locator for the given title.
+   *
+   * Sidebar sections appear as `.page-sidebar__section` blocks with a heading.
+   */
   sidebarSection(title: 'ETF Details' | 'ETF Market Data'): Locator {
     return this.page
       .locator('.page-sidebar__section')
       .filter({ has: this.page.getByRole('heading', { name: new RegExp(`^${title}$`, 'i') }) });
   }
 
+  /**
+   * Asserts that all values in the requested sidebar section are non-empty.
+   *
+   * This validates that data tiles rendered and are not missing/blank.
+   */
   async assertSidebarValuesFilled(title: 'ETF Details' | 'ETF Market Data'): Promise<void> {
     const section = this.sidebarSection(title);
     await expect(section, `${title}: section should be visible`).toBeVisible();
@@ -85,15 +126,26 @@ export class FundPage {
     }
   }
 
+  /**
+   * Clicks a fund tab by accessible name and waits for the active tabpanel to be visible.
+   *
+   * Tabs can trigger async loads; this method centralizes the wait.
+   */
   async clickTab(name: FundTab): Promise<void> {
     await this.page.getByRole('tab', { name: new RegExp(name, 'i') }).click();
     await this.visibleTabpanel.waitFor({ state: 'visible', timeout: 60_000 });
   }
 
+  /** Asserts that the given tab does not exist for the current product. */
   async assertTabAbsent(name: FundTab): Promise<void> {
     await expect(this.page.getByRole('tab', { name: new RegExp(name, 'i') })).toHaveCount(0);
   }
 
+  /**
+   * Returns the first visible tabpanel.
+   *
+   * Playwright's role locator can see multiple tabpanels in the DOM; we only use the visible one.
+   */
   get visibleTabpanel(): Locator {
     return this.page.getByRole('tabpanel').filter({ visible: true }).first();
   }
@@ -110,6 +162,11 @@ export class FundPage {
     }
   }
 
+  /**
+   * Asserts that a table's `<tbody>` has no empty `th`/`td` cell content.
+   *
+   * This normalizes NBSP to spaces before trimming.
+   */
   private async assertTableBodyHasNoEmptyCells(table: Locator): Promise<void> {
     const empties = await table.evaluate((tbl) => {
       const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim();
@@ -140,7 +197,7 @@ export class FundPage {
   }
 
   /**
-   * Outcome tab: “Data from …” stamp matches expected as-of behavior.
+   * Outcome tab: asserts that the “Data from …” stamp matches the expected as-of behavior.
    */
   async assertOutcomePeriodDateSignals(): Promise<void> {
     const panel = this.visibleTabpanel;
@@ -155,6 +212,14 @@ export class FundPage {
     );
   }
 
+  /**
+   * Attempts to parse the first date-like token from free-form UI text.
+   *
+   * Supported formats (first match wins):
+   * - US: `M/D/YYYY`
+   * - named months (common in Highcharts accessibility text): `Apr 21, 2026`
+   * - ISO: `YYYY-MM-DD`
+   */
   private extractFirstDateFromText(text: string): string | null {
     const us = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
     if (us?.[1]) return normalizeUsMdy(us[1]);
@@ -193,6 +258,11 @@ export class FundPage {
     return null;
   }
 
+  /**
+   * Clicks the "Download chart data (CSV)" link and returns the local temp file path.
+   *
+   * The caller is responsible for reading and deleting the temp file if needed.
+   */
   async downloadOutcomeChartCsv(): Promise<string> {
     const [download] = await Promise.all([
       this.page.waitForEvent('download'),
@@ -212,6 +282,7 @@ export class FundPage {
     raw = raw.replace(/^\uFEFF/, '');
     const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
     expect(lines.length > 1, 'CSV should include header + data rows').toBeTruthy();
+    // Around weekends the export can lag by more than one working day, so we accept a small range.
     const needles = isWeekendET() ? [previousWorkingDayET_usMdy_n(1), previousWorkingDayET_usMdy_n(2)] : [previousWorkingDayET_usMdy_n(1)];
     const isos = needles.map((needle) => {
       const [mm, dd, yyyy] = needle.split('/').map(Number);
@@ -227,6 +298,11 @@ export class FundPage {
     expect(hit, `Outcome chart CSV: expected ≥1 data row mentioning ${needles.join(' or ')} (or ISO forms)`).toBe(true);
   }
 
+  /**
+   * Holdings tab: validates as-of dates and that all visible tables contain data.
+   *
+   * The page has different UI shapes for FoF vs non-FoF tickers, so expectations differ.
+   */
   async assertHoldingsTab(ticker: string): Promise<void> {
     await this.clickTab('Holdings');
     const panel = this.visibleTabpanel;
@@ -262,6 +338,11 @@ export class FundPage {
     await this.assertAllDataTablesFilled(panel, 'Holdings tab');
   }
 
+  /**
+   * Performance tab: validates as-of date (when present) and checks visible tables for blank cells.
+   *
+   * Some tickers are excluded due to known UI differences.
+   */
   async assertPerformanceTab(ticker: string): Promise<void> {
     if (PERFORMANCE_SKIP_TICKERS.includes(ticker as (typeof PERFORMANCE_SKIP_TICKERS)[number])) return;
 
@@ -281,6 +362,9 @@ export class FundPage {
     await this.assertAllDataTablesFilled(panel, 'Performance tab');
   }
 
+  /**
+   * Overview/Documents tabs: asserts the tab renders meaningful text and is not an error page.
+   */
   async assertOverviewOrDocumentsTab(tabName: 'Overview' | 'Documents'): Promise<void> {
     await this.clickTab(tabName);
     const panel = this.visibleTabpanel;

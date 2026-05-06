@@ -1,14 +1,37 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+/**
+ * Tabs available on the "Product Table" page.
+ *
+ * Note: the strings match the tab accessible names used by Playwright selectors.
+ */
 export type ProductTableTab = 'Overview & Fees' | 'Characteristics' | 'Performance' | 'Documents';
 
+/**
+ * Page Object for the "Product Table" page.
+ *
+ * Responsibilities:
+ * - navigate to the page and wait for the main table to become interactable
+ * - switch tabs and extract as-of dates
+ * - validate table content (e.g. empty cells)
+ * - interact with the filter sidebar (checkbox-driven)
+ */
 export class ProductTablePage {
+  /** Root table element for the active tab. */
   readonly mainTable: Locator;
+  /** Best-effort cookie/banner dismiss link (can intermittently appear). */
   readonly cookieDismiss: Locator;
+  /** Button that clears all active filters (only visible when filters are applied). */
   readonly clearFiltersButton: Locator;
+  /** Accordion toggle for expanding/collapsing the filter sidebar. */
   readonly filtersAccordionToggle: Locator;
 
+  /**
+   * Creates a page object bound to the provided Playwright `Page`.
+   *
+   * Locators are intentionally broad and resolved at runtime to tolerate minor layout changes.
+   */
   constructor(readonly page: Page) {
     this.mainTable = page.getByRole('table').first();
     this.cookieDismiss = page.getByRole('link', { name: /dismiss/i }).first();
@@ -16,6 +39,11 @@ export class ProductTablePage {
     this.filtersAccordionToggle = page.getByText(/Filter:\s*/i).first();
   }
 
+  /**
+   * Dismisses the cookie banner if it is visible.
+   *
+   * The banner can intercept clicks, so most interactions call this defensively.
+   */
   private async dismissCookieBannerIfPresent(): Promise<void> {
     // This site sometimes shows a cookie notice that can intercept clicks.
     if (await this.cookieDismiss.isVisible().catch(() => false)) {
@@ -23,6 +51,11 @@ export class ProductTablePage {
     }
   }
 
+  /**
+   * Navigates to `/product-table` and waits until the table is visible.
+   *
+   * Includes small resilience measures for occasional aborted navigation or lazy rendering.
+   */
   async goto(): Promise<void> {
     try {
       await this.page.goto('/product-table', { waitUntil: 'domcontentloaded' });
@@ -41,12 +74,22 @@ export class ProductTablePage {
     }
   }
 
+  /**
+   * Opens the specified tab and waits for the table to re-render.
+   *
+   * Callers typically use this before reading "as of" stamps or validating cells.
+   */
   async openTab(name: ProductTableTab): Promise<void> {
     await this.page.getByRole('tab', { name }).click();
     await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
     await this.dismissCookieBannerIfPresent();
   }
 
+  /**
+   * Opens the product table and navigates to a specific ETF fund page by ticker.
+   *
+   * This assumes the overview tab contains a link matching the ticker symbol.
+   */
   async openFundPageFromOverviewFees(ticker: string): Promise<void> {
     await this.goto();
     await this.openTab('Overview & Fees');
@@ -71,6 +114,11 @@ export class ProductTablePage {
     });
   }
 
+  /**
+   * Asserts that the current table has no visually-empty cells in its `<tbody>`.
+   *
+   * Some products can legitimately omit values in known rows; those can be excluded via `skipRowTickers`.
+   */
   async assertNoEmptyCells(opts?: { skipRowTickers?: readonly string[] }): Promise<void> {
     const skip = new Set((opts?.skipRowTickers ?? []).map((t) => t.toUpperCase()));
 
@@ -162,6 +210,11 @@ export class ProductTablePage {
     }
   }
 
+  /**
+   * Clicks "Download table data (CSV)" and returns the temp path Playwright saved.
+   *
+   * This returns a local temp file path, not the original URL.
+   */
   async downloadTableCsv(): Promise<string> {
     await this.dismissCookieBannerIfPresent();
     const link = this.page.getByRole('link', { name: /Download table data \(CSV\)/i });
@@ -175,6 +228,11 @@ export class ProductTablePage {
     return path!;
   }
 
+  /**
+   * Clears all applied filters if the UI indicates any are active.
+   *
+   * When no filters are active the "Clear filters" button may not be visible.
+   */
   async clearFilters(): Promise<void> {
     await this.dismissCookieBannerIfPresent();
     if (await this.clearFiltersButton.isVisible().catch(() => false)) {
@@ -183,6 +241,11 @@ export class ProductTablePage {
     }
   }
 
+  /**
+   * Ensures the filter sidebar is expanded and at least one checkbox is visible.
+   *
+   * Some pages render the filter controls lazily; this method waits for them.
+   */
   async expandFiltersIfCollapsed(): Promise<void> {
     await this.dismissCookieBannerIfPresent();
     // The filters live inside an accordion; if it's collapsed, checkboxes won't be in the tree.
@@ -231,6 +294,11 @@ export class ProductTablePage {
     return Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
   }
 
+  /**
+   * Returns whether a filter checkbox with the given label exists.
+   *
+   * This assumes the filter sidebar is already expanded once in the test, to avoid flakiness.
+   */
   async filterCheckboxExists(name: string): Promise<boolean> {
     await this.dismissCookieBannerIfPresent();
     // Assumes `expandFiltersIfCollapsed()` was called by the test once.
@@ -246,6 +314,11 @@ export class ProductTablePage {
     await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
   }
 
+  /**
+   * Returns the visible column header button texts for the current table.
+   *
+   * Useful for smoke assertions when a tab changes available sortable columns.
+   */
   async listSortableColumnNames(): Promise<string[]> {
     await this.dismissCookieBannerIfPresent();
     const btns = this.mainTable.getByRole('button');
@@ -261,12 +334,18 @@ export class ProductTablePage {
     return Array.from(new Set(out));
   }
 
+  /**
+   * Convenience helper for reading the first N ticker symbols currently shown.
+   *
+   * This does not change pagination/infinite scroll; it only reads what's already rendered.
+   */
   async readFirstNTickers(n: number): Promise<string[]> {
     const tickers = await this.collectTickerSymbols();
     return tickers.slice(0, n);
   }
 }
 
+/** Escapes a string so it can be safely embedded into a RegExp pattern. */
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

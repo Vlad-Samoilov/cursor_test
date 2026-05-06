@@ -1,3 +1,11 @@
+/**
+ * Ticker allowlists used by smoke tests.
+ *
+ * These lists are intentionally explicit (not discovered from the UI) to catch:
+ * - missing products (ticker absent from the table)
+ * - unexpected products (ticker added without acknowledgement)
+ * - duplicates (ticker appears in multiple rows)
+ */
 export const TICKERS_BUFFER_CAPPED = [
   'QBSV',
   'QBSF',
@@ -39,10 +47,13 @@ export const TICKERS_BUFFER_CAPPED = [
   'SIXD',
 ] as const;
 
+/** "Floor 5" strategy tickers. */
 export const TICKERS_FLOOR5 = ['FLJJ', 'FLAO'] as const;
 
+/** "Buffer 100" strategy tickers. */
 export const TICKERS_BUFFER100 = ['AIOO'] as const;
 
+/** Fund-of-Funds tickers (FoF UI differs from standard fund pages). */
 export const TICKERS_FOF = ['SPBU', 'SPBX', 'SPBW'] as const;
 
 /**
@@ -51,6 +62,7 @@ export const TICKERS_FOF = ['SPBU', 'SPBX', 'SPBW'] as const;
  */
 export const PERFORMANCE_SKIP_TICKERS = ['QBSV', 'QBQF', 'QBQV', 'QBIF', 'QBIV', 'QBKV', 'QBKF', 'ARLI'] as const;
 
+/** "Buffer Uncapped" strategy tickers. */
 export const TICKERS_BUFFER_UNCAPPED = [
   'JANU',
   'JANI',
@@ -68,6 +80,7 @@ export const TICKERS_BUFFER_UNCAPPED = [
   'DECU',
 ] as const;
 
+/** All tickers across strategies, sorted for stable snapshots/logs. */
 export const ALL_TICKERS: readonly string[] = [
   ...TICKERS_BUFFER_CAPPED,
   ...TICKERS_FLOOR5,
@@ -76,6 +89,8 @@ export const ALL_TICKERS: readonly string[] = [
   ...TICKERS_BUFFER_UNCAPPED,
 ].sort();
 
+/** Fast membership set for FoF filtering. */
 const FOF_SET = new Set<string>(TICKERS_FOF);
 
+/** All tickers excluding FoF, sorted for stable iteration. */
 export const NON_FOF_TICKERS: readonly string[] = ALL_TICKERS.filter((t) => !FOF_SET.has(t)).sort();

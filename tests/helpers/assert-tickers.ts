@@ -1,14 +1,32 @@
 import { expect } from '@playwright/test';
 
+/**
+ * Result of comparing ticker symbols observed in the UI vs the expected allowlist.
+ *
+ * The analysis is designed for a "one ticker per row" table model.
+ */
 export type TickerMismatch = {
+  /** Expected tickers missing from the table. */
   missing: string[];
+  /** Unexpected tickers present in the table. */
   extra: string[];
+  /** Whether the table contains duplicate ticker rows. */
   hasDuplicateRows: boolean;
+  /** Number of tickers in the expected allowlist. */
   expectedCount: number;
+  /** Total number of rows parsed from the table. */
   actualRowCount: number;
+  /** Number of unique tickers found in `actual`. */
   uniqueCount: number;
 };
 
+/**
+ * Computes set-like differences between `actual` and `expected` tickers.
+ *
+ * Notes:
+ * - `actual` may contain duplicates if the table rendered the same ticker multiple times.
+ * - `expected` is treated as the authoritative allowlist.
+ */
 export function analyzeTickerSets(actual: string[], expected: readonly string[]): TickerMismatch {
   const uniq = [...new Set(actual)];
   const missing = [...expected].filter((t) => !uniq.includes(t)).sort();
@@ -34,6 +52,15 @@ export function formatTickerMismatchBrief(m: TickerMismatch): string {
   return parts.join(' ');
 }
 
+/**
+ * Asserts that the table's ticker column matches the expected allowlist exactly.
+ *
+ * This check requires:
+ * - no duplicate rows (one row per ticker)
+ * - no missing tickers
+ * - no unexpected tickers
+ * - row count equals expected count
+ */
 export function assertTickerColumnMatches(
   actual: string[],
   expected: readonly string[],
@@ -52,6 +79,11 @@ export function assertTickerColumnMatches(
   ).toBe(true);
 }
 
+/**
+ * Builds a detailed, human-readable explanation of a mismatch for assertion messages.
+ *
+ * The output is formatted for both terminal logs and Playwright HTML report rendering.
+ */
 function formatTickerMismatchExplanation(title: string, m: TickerMismatch): string {
   const lines: string[] = [
     'What went wrong',

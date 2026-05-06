@@ -3,10 +3,25 @@ import { FUND_PAGE_STRATEGIES, pickRandomTicker } from './fixtures/fund-page-sam
 import { FundPage } from './po/fund-page.po';
 import { ProductTablePage } from './po/product-table.po';
 
+/**
+ * Smoke tests for ETF "Fund" pages.
+ *
+ * Each strategy test picks a random ticker from a pool and validates:
+ * - sidebar sections contain non-empty values
+ * - date stamps follow expected ET business rules
+ * - tables do not contain blank cells
+ * - CSV export contains at least one expected date row (where applicable)
+ */
 test.describe('Fund page @smoke', () => {
   test.describe.configure({ timeout: 180_000 });
 
   for (const def of FUND_PAGE_STRATEGIES) {
+    /**
+     * Strategy-driven fund page checks.
+     *
+     * The ticker is sampled randomly on each test run (including retries), so failures
+     * can be intermittent across products within the same strategy pool.
+     */
     test(`${def.strategy}: fund page checks`, async ({ page }) => {
       const t = pickRandomTicker(def.pool);
       const hasOutcome = def.hasOutcomePeriodTab;
