@@ -1,0 +1,23 @@
+---
+description: Use local Zephyr test catalog as context for test changes
+globs: tests/**/*.ts,playwright.config.ts
+alwaysApply: false
+---
+
+# Zephyr Summary as Test Context
+
+When working on **Playwright tests or test-related code** in this repo (specs, fixtures, helpers, page objects, config):
+
+- **Always consult the local Zephyr test catalog summary** at:
+  - `docs-local/test-cases/zephyr-scale-tests.summary.md`
+- Use it to:
+  - align new/updated tests with existing documented scenarios
+  - reuse consistent naming, preconditions, and expected results
+  - avoid duplicating an already-covered test case
+  - identify missing coverage when adding new automation
+
+## If the file is missing
+
+This file is intentionally **not committed** for compliance. If it is not present on the current machine:
+- proceed using repo context only
+- ask the user to regenerate/copy it locally (or to share relevant excerpts) before implementing large new test coverage

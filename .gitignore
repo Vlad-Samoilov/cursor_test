@@ -7,3 +7,6 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 .playwright-mcp/
+
+# Local-only documentation / compliance-sensitive artifacts (NOT committed)
+/docs-local/
