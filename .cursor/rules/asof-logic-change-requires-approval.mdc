@@ -1,0 +1,20 @@
+---
+description: Require user approval before changing as-of expectations logic
+globs: tests/helpers/dates.ts
+alwaysApply: false
+---
+
+# As-of Logic Changes Require Approval
+
+The "as of" date expectations are **strict** and intentionally encode business rules.
+
+If you believe the as-of logic needs to change (including tolerance windows, publish-window thresholds, weekend rules, or expected date modes), you must:
+
+- **Stop before editing** `tests/helpers/dates.ts` in a way that changes as-of behavior.
+- **Ask the user for approval first**, explaining:
+  - what is failing / what prompted the change
+  - the exact behavioral change you propose (before vs after)
+  - why this change is correct from a business-rules standpoint (not just to reduce test failures)
+
+Only proceed with the change after the user explicitly approves.
+

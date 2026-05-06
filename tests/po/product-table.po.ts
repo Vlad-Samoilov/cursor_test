@@ -1,5 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { readVisibleDataAsOfUsMdy } from '../helpers/ui-asof';
+import { assertNoEmptyTbodyCells } from '../helpers/table-asserts';
+import { normalizeUsMdy } from '../helpers/dates';
 
 /**
  * Tabs available on the "Product Table" page.
@@ -20,6 +23,8 @@ export type ProductTableTab = 'Overview & Fees' | 'Characteristics' | 'Performan
 export class ProductTablePage {
   /** Root table element for the active tab. */
   readonly mainTable: Locator;
+  /** Visible tabpanel that contains the active table. */
+  readonly activeTabpanel: Locator;
   /** Best-effort cookie/banner dismiss link (can intermittently appear). */
   readonly cookieDismiss: Locator;
   /** Button that clears all active filters (only visible when filters are applied). */
@@ -33,10 +38,30 @@ export class ProductTablePage {
    * Locators are intentionally broad and resolved at runtime to tolerate minor layout changes.
    */
   constructor(readonly page: Page) {
-    this.mainTable = page.getByRole('table').first();
+    this.activeTabpanel = page.getByRole('tabpanel').filter({ visible: true }).first();
+    // Scope the table lookup to the active tabpanel to avoid accidentally selecting unrelated tables.
+    this.mainTable = this.activeTabpanel.getByRole('table').first();
     this.cookieDismiss = page.getByRole('link', { name: /dismiss/i }).first();
     this.clearFiltersButton = page.getByRole('button', { name: /Clear filters/i }).first();
     this.filtersAccordionToggle = page.getByText(/Filter:\s*/i).first();
+  }
+
+  /**
+   * Waits until the table appears to have refreshed after an interaction.
+   *
+   * We avoid relying on "visibility" alone, since the table can remain visible while data updates.
+   * A refresh is considered to have happened when either:
+   * - row count changes, or
+   * - the first N ticker symbols change
+   */
+  private async waitForTableRefresh(after: { beforeRowCount: number; beforeTickerSig: string }): Promise<void> {
+    await expect
+      .poll(async () => {
+        const rowCount = await this.mainTable.locator('tbody tr').count().catch(() => 0);
+        const tickerSig = (await this.readFirstNTickers(10).catch(() => [])).join(',');
+        return rowCount !== after.beforeRowCount || tickerSig !== after.beforeTickerSig;
+      }, { timeout: 60_000 })
+      .toBe(true);
   }
 
   /**
@@ -80,7 +105,20 @@ export class ProductTablePage {
    * Callers typically use this before reading "as of" stamps or validating cells.
    */
   async openTab(name: ProductTableTab): Promise<void> {
-    await this.page.getByRole('tab', { name }).click();
+    const tab = this.page.getByRole('tab', { name });
+    const alreadySelected = await tab.getAttribute('aria-selected').catch(() => null);
+    if (String(alreadySelected).toLowerCase() === 'true') {
+      await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+      await this.dismissCookieBannerIfPresent();
+      return;
+    }
+
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
+    const panelId = await tab.getAttribute('aria-controls').catch(() => null);
+    if (panelId) {
+      await this.page.locator(`#${panelId}`).waitFor({ state: 'visible', timeout: 60_000 });
+    }
     await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
     await this.dismissCookieBannerIfPresent();
   }
@@ -93,7 +131,8 @@ export class ProductTablePage {
   async openFundPageFromOverviewFees(ticker: string): Promise<void> {
     await this.goto();
     await this.openTab('Overview & Fees');
-    await this.page.getByRole('link', { name: ticker }).first().click();
+    // Prefer the ticker link within the table itself to avoid matching unrelated nav/marketing links.
+    await this.mainTable.getByRole('link', { name: new RegExp(`^${escapeRegExp(ticker)}$`, 'i') }).first().click();
     await this.page.waitForURL(new RegExp(`/etfs/${ticker.toLowerCase()}`, 'i'), { timeout: 60_000 });
   }
 
@@ -121,79 +160,21 @@ export class ProductTablePage {
    */
   async assertNoEmptyCells(opts?: { skipRowTickers?: readonly string[] }): Promise<void> {
     const skip = new Set((opts?.skipRowTickers ?? []).map((t) => t.toUpperCase()));
-
-    const empties = await this.mainTable.evaluate(
-      (tbl, skipArr) => {
-        const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim();
-        const out: Array<{ row: number; col: number; ticker: string; raw: string }> = [];
-        const skipSet = new Set((skipArr ?? []).map((t) => String(t).toUpperCase()));
-
-        const rows = Array.from(tbl.querySelectorAll('tbody tr'));
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i]!;
-          const th = row.querySelector('th[scope="row"]');
-          const rowTicker = normalize((th?.textContent ?? '').split(/\s+/)[0] ?? '') || '(unknown)';
-          if (skipSet.has(rowTicker.toUpperCase())) continue;
-
-          const cells = Array.from(row.querySelectorAll('th, td'));
-          for (let j = 0; j < cells.length; j++) {
-            const raw = cells[j]?.textContent ?? '';
-            if (normalize(raw).length === 0) {
-              out.push({ row: i + 1, col: j + 1, ticker: rowTicker, raw });
-            }
-          }
-        }
-
-        return { rowCount: rows.length, empties: out };
-      },
-      Array.from(skip),
-    );
-
-    expect(empties.rowCount, 'product table should have at least one body row').toBeGreaterThan(0);
-    expect(
-      empties.empties.length,
-      empties.empties.length === 0
-        ? ''
-        : [
-            `Empty cell(s) in product table.`,
-            `• Tab: whichever is active (Overview / Characteristics / Performance / Documents).`,
-            `• First empty: row ${empties.empties[0]!.row} (${empties.empties[0]!.ticker}), column ${empties.empties[0]!.col}.`,
-            `• Raw cell text: ${JSON.stringify(empties.empties[0]!.raw)}`,
-            `Fix: cells should display a value, placeholder (e.g. dash), or link text — not a blank.`,
-            empties.empties.length > 1 ? `• Total empty cells found: ${empties.empties.length}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n'),
-    ).toBe(0);
+    await assertNoEmptyTbodyCells(this.mainTable, {
+      context: 'Product Table: no empty cells in <tbody>',
+      rowKeyCss: 'th[scope="row"]',
+      rowKeyExtractor: 'first_token',
+      skipRowKeys: skip,
+    });
   }
 
   /**
-   * Reads the visible "Data as of …" line for the active tab (only one tab shows a primary as-of label at a time).
-   * Returns the first M/D/YYYY segment.
+   * Picks the first visible "Data as of … M/D/YYYY …" label (tabs may leave non-visible duplicates in the DOM).
+   *
+   * This delegates to a shared helper so Fund Page and Product Table stay consistent.
    */
-  private normalizeUsMdy(m: RegExpMatchArray): string {
-    const month = Number(m[1]);
-    const day = Number(m[2]);
-    const year = Number(m[3]);
-    return `${month}/${day}/${year}`;
-  }
-
-  /** Picks the first visible "Data as of … M/D/YYYY …" label (tabs may leave non-visible duplicates in the DOM). */
   async readVisibleAsOfUsDate(): Promise<string> {
-    const candidates = this.page.getByText(/Data as of\s+\d{1,2}\/\d{1,2}\/\d{4}/);
-    const n = await candidates.count();
-    for (let i = 0; i < n; i++) {
-      const c = candidates.nth(i);
-      if (!(await c.isVisible())) continue;
-      const raw =
-        ((await c.evaluate((el) => el.parentElement?.innerText ?? el.textContent ?? '')) ?? '')
-          .trim()
-          .replace(/\s+/g, ' ');
-      const m = raw.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-      if (m) return this.normalizeUsMdy(m);
-    }
-
-    throw new Error('could not find a visible "Data as of MM/DD/YYYY" label');
+    return await readVisibleDataAsOfUsMdy(this.page.locator('body'));
   }
 
   /** Overview/Characteristics sometimes split text nodes; fall back to `innerText()` (generally excludes hidden subtrees). */
@@ -204,9 +185,7 @@ export class ProductTablePage {
       const viewportText = await this.page.locator('body').innerText();
       const m = viewportText.match(/Data as of\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
       expect(m, 'could not find Data as of M/D/YYYY in visible body text').toBeTruthy();
-      const inner = m![1].match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-      expect(inner, `could not parse US date from: ${m![1]}`).toBeTruthy();
-      return this.normalizeUsMdy(inner!);
+      return normalizeUsMdy(m![1]);
     }
   }
 
@@ -238,6 +217,9 @@ export class ProductTablePage {
     if (await this.clearFiltersButton.isVisible().catch(() => false)) {
       await this.clearFiltersButton.click();
       await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+      // "Clear filters" can restore the same visible order/count depending on dataset.
+      // The test suite asserts the restored baseline explicitly, so we only need to wait for stability.
+      await this.dismissCookieBannerIfPresent();
     }
   }
 
@@ -272,6 +254,7 @@ export class ProductTablePage {
     const cb = this.page.getByRole('checkbox', { name: label }).first();
     await cb.scrollIntoViewIfNeeded().catch(() => {});
     await cb.click({ timeout: 15_000 });
+    await expect(cb).toBeChecked({ timeout: 15_000 });
     await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
   }
 
@@ -309,9 +292,12 @@ export class ProductTablePage {
   async sortByColumn(columnName: string | RegExp): Promise<void> {
     await this.dismissCookieBannerIfPresent();
     const headerBtn = this.mainTable.getByRole('button', { name: columnName }).first();
+    const beforeRowCount = await this.mainTable.locator('tbody tr').count().catch(() => 0);
+    const beforeTickerSig = (await this.readFirstNTickers(10).catch(() => [])).join(',');
     await headerBtn.scrollIntoViewIfNeeded().catch(() => {});
     await headerBtn.click();
     await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+    await this.waitForTableRefresh({ beforeRowCount, beforeTickerSig });
   }
 
   /**

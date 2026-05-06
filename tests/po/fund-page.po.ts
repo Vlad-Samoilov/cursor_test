@@ -11,6 +11,8 @@ import {
 } from '../helpers/dates';
 import { PERFORMANCE_SKIP_TICKERS, TICKERS_FOF } from '../fixtures/tickers';
 import { splitCsvLine } from '../helpers/characteristics-csv';
+import { readVisibleDataAsOfUsMdy } from '../helpers/ui-asof';
+import { assertNoEmptyTbodyCells } from '../helpers/table-asserts';
 import { DateTime } from 'luxon';
 
 /** IANA timezone identifier used for "ET" expectations in tests. */
@@ -52,33 +54,13 @@ export class FundPage {
   constructor(readonly page: Page) {}
 
   /**
-   * Extracts the first US-style date \(M/D/YYYY\) found in a string and normalizes it.
-   *
-   * Returns `null` when no US date is present.
-   */
-  private extractUsMdyFromText(text: string): string | null {
-    const m = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
-    return m?.[1] ? normalizeUsMdy(m[1]) : null;
-  }
-
-  /**
    * Reads the first visible "Data as of M/D/YYYY" label within a panel and returns the date.
    *
    * We explicitly check visibility because the DOM can contain stale stamps from other tabs/panels.
    */
   private async readPanelDataAsOfUsDate(panel: Locator): Promise<string> {
-    const candidates = panel.getByText(/Data as of\s+\d{1,2}\/\d{1,2}\/\d{4}/i);
-    const n = await candidates.count();
-    for (let i = 0; i < n; i++) {
-      const c = candidates.nth(i);
-      if (!(await c.isVisible().catch(() => false))) continue;
-      const raw = ((await c.evaluate((el) => el.parentElement?.innerText ?? el.textContent ?? '')) ?? '')
-        .trim()
-        .replace(/\s+/g, ' ');
-      const parsed = this.extractUsMdyFromText(raw);
-      if (parsed) return parsed;
-    }
-    throw new Error('could not find a visible "Data as of MM/DD/YYYY" label in the active panel');
+    const usMdy = await readVisibleDataAsOfUsMdy(panel);
+    return normalizeUsMdy(usMdy);
   }
 
   /**
@@ -168,32 +150,7 @@ export class FundPage {
    * This normalizes NBSP to spaces before trimming.
    */
   private async assertTableBodyHasNoEmptyCells(table: Locator): Promise<void> {
-    const empties = await table.evaluate((tbl) => {
-      const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim();
-      const out: Array<{ row: number; col: number; raw: string }> = [];
-      const rows = Array.from(tbl.querySelectorAll('tbody tr'));
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i]!;
-        const cells = Array.from(row.querySelectorAll('th, td'));
-        for (let j = 0; j < cells.length; j++) {
-          const raw = cells[j]?.textContent ?? '';
-          if (normalize(raw).length === 0) out.push({ row: i + 1, col: j + 1, raw });
-        }
-      }
-      return { rowCount: rows.length, empties: out };
-    });
-
-    expect(empties.rowCount, 'fund page table should have at least one body row').toBeGreaterThan(0);
-    expect(
-      empties.empties.length,
-      empties.empties.length === 0
-        ? ''
-        : [
-            `Empty cell(s) in fund page table.`,
-            `• First empty: row ${empties.empties[0]!.row}, column ${empties.empties[0]!.col}.`,
-            `• Raw cell text: ${JSON.stringify(empties.empties[0]!.raw)}`,
-          ].join('\n'),
-    ).toBe(0);
+    await assertNoEmptyTbodyCells(table, { context: 'Fund page table: no empty cells in <tbody>' });
   }
 
   /**
@@ -266,7 +223,7 @@ export class FundPage {
   async downloadOutcomeChartCsv(): Promise<string> {
     const [download] = await Promise.all([
       this.page.waitForEvent('download'),
-      this.page
+      this.visibleTabpanel
         .getByRole('link', { name: /Download chart data \(CSV\)/i })
         .first()
         .click(),

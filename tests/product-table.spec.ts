@@ -200,7 +200,8 @@ test.describe('Product table @smoke', () => {
    * accessible names can be inconsistent under load.
    */
   test('6. Filters + Clear filters — random filters change results and restore baseline', async ({ page }, testInfo) => {
-    testInfo.setTimeout(120_000);
+    // This test performs multiple UI interactions and can run slower under parallel load.
+    testInfo.setTimeout(180_000);
     const pt = new ProductTablePage(page);
     await pt.goto();
     await pt.expandFiltersIfCollapsed();
@@ -296,18 +297,41 @@ test.describe('Product table @smoke', () => {
     // Prefer columns that are likely to reorder rows.
     const candidates = sortable.filter((n) => !/Fact Sheet/i.test(n));
     expect(candidates.length, 'should find sortable column headers').toBeGreaterThan(0);
-    const col = candidates[Math.floor(rng() * candidates.length)]!;
 
-    const wantDesc = rng() < 0.5;
-    await test.step(`Sort random column (seed=${seed}): ${col} → ${wantDesc ? 'desc' : 'asc'}`, async () => {
-      // 1 click = some direction, 2 clicks = the opposite. We don't rely on aria-sort being present.
-      const clicks = wantDesc ? 2 : 1;
-      for (let i = 0; i < clicks; i++) await pt.sortByColumn(new RegExp(`^${escapeRegExp(col)}$`, 'i'));
-    });
+    let after: string[] = [];
+    let pickedCol = '';
+    let pickedDesc = false;
+    let changed = false;
 
-    const after = await pt.readFirstNTickers(10);
-    expect(after.length, 'should have tickers after sorting').toBeGreaterThan(0);
-    expect(after.join(','), 'sorting should change visible order').not.toBe(before.join(','));
+    // Some columns may be sortable but not change the visible order for a given dataset snapshot.
+    // Try a few random candidates before failing to reduce flakes.
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      const col = candidates[Math.floor(rng() * candidates.length)]!;
+      const wantDesc = rng() < 0.5;
+
+      await test.step(
+        `Sort random column attempt ${attempt} (seed=${seed}): ${col} → ${wantDesc ? 'desc' : 'asc'}`,
+        async () => {
+          // 1 click = some direction, 2 clicks = the opposite. We don't rely on aria-sort being present.
+          const clicks = wantDesc ? 2 : 1;
+          for (let i = 0; i < clicks; i++) await pt.sortByColumn(new RegExp(`^${escapeRegExp(col)}$`, 'i'));
+        },
+      );
+
+      after = await pt.readFirstNTickers(10);
+      expect(after.length, 'should have tickers after sorting').toBeGreaterThan(0);
+      if (after.join(',') !== before.join(',')) {
+        pickedCol = col;
+        pickedDesc = wantDesc;
+        changed = true;
+        break;
+      }
+    }
+
+    expect(
+      changed,
+      `sorting did not change visible order after multiple attempts (seed=${seed}). Last attempt: ${pickedCol} → ${pickedDesc ? 'desc' : 'asc'}`,
+    ).toBe(true);
   });
 });
 

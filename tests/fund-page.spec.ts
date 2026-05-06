@@ -19,16 +19,21 @@ test.describe('Fund page @smoke', () => {
     /**
      * Strategy-driven fund page checks.
      *
-     * The ticker is sampled randomly on each test run (including retries), so failures
-     * can be intermittent across products within the same strategy pool.
+     * The ticker is sampled from the strategy pool using a deterministic RNG derived from
+     * `SMOKE_SEED` and `workerIndex`, so failures are reproducible by seed.
      */
-    test(`${def.strategy}: fund page checks`, async ({ page }) => {
-      const t = pickRandomTicker(def.pool);
+    test(`${def.strategy}: fund page checks`, async ({ page }, testInfo) => {
+      const seed = Number(process.env.SMOKE_SEED ?? Date.now());
+      const rng = mulberry32(seed + 2000 + testInfo.workerIndex);
+      const t = pickRandomTicker(def.pool, rng);
       const hasOutcome = def.hasOutcomePeriodTab;
       const pt = new ProductTablePage(page);
       const fund = new FundPage(page);
 
-      await test.step(`Ticker for this run: ${t} (random from ${def.pool.length} ${def.strategy} symbol(s))`, async () => {});
+      await test.step(
+        `Ticker for this run: ${t} (seed=${seed}; worker=${testInfo.workerIndex}; pool=${def.pool.length} ${def.strategy} symbol(s))`,
+        async () => {},
+      );
 
       await test.step('Open fund from Product Table (Overview & Fees → Ticker link)', async () => {
         await pt.openFundPageFromOverviewFees(t);
@@ -82,3 +87,18 @@ test.describe('Fund page @smoke', () => {
     });
   }
 });
+
+/**
+ * Small deterministic RNG for test reproducibility.
+ *
+ * When combined with `SMOKE_SEED` and `workerIndex`, this makes "random" ticker selection debuggable.
+ */
+function mulberry32(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}

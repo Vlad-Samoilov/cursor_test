@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import {
   TICKERS_BUFFER100,
   TICKERS_BUFFER_CAPPED,
@@ -17,12 +16,15 @@ export type FundPageStrategyDefinition = {
   hasOutcomePeriodTab: boolean;
 };
 
-/** Uniform random pick — new choice every time the test body runs (including retries). */
-export function pickRandomTicker(pool: readonly string[]): string {
+/**
+ * Uniform random pick using a provided RNG.
+ *
+ * This is used by the Fund Page smoke suite to pick a representative ticker from a strategy pool.
+ * Prefer deterministic RNGs in CI so failures are reproducible by seed.
+ */
+export function pickRandomTicker(pool: readonly string[], rng: () => number): string {
   if (pool.length === 0) throw new Error('Ticker pool must not be empty');
-  const buf = new Uint32Array(1);
-  crypto.getRandomValues(buf);
-  const idx = buf[0]! % pool.length;
+  const idx = Math.floor(rng() * pool.length);
   return pool[idx]!;
 }
 
