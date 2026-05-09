@@ -18,6 +18,21 @@ import { DateTime } from 'luxon';
 /** IANA timezone identifier used for "ET" expectations in tests. */
 const NY_TZ = 'America/New_York';
 
+/** Escapes a string for use inside a `RegExp` source (exact-match tab labels). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Builds a locator for an element by HTML `id`, safe for arbitrary IDs (e.g. React `useId()` with `:`).
+ *
+ * Uses an attribute selector so we do not depend on `#id` CSS escaping rules.
+ */
+function locatorById(page: Page, id: string): Locator {
+  const escaped = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return page.locator(`[id="${escaped}"]`);
+}
+
 /**
  * Returns whether it is currently Saturday/Sunday in New York time.
  *
@@ -109,27 +124,62 @@ export class FundPage {
   }
 
   /**
-   * Clicks a fund tab by accessible name and waits for the active tabpanel to be visible.
+   * Exact accessible-name match for a fund tab (case-insensitive).
    *
-   * Tabs can trigger async loads; this method centralizes the wait.
+   * Using `^…$` avoids matching a shorter tab label that is a substring of another.
    */
-  async clickTab(name: FundTab): Promise<void> {
-    await this.page.getByRole('tab', { name: new RegExp(name, 'i') }).click();
-    await this.visibleTabpanel.waitFor({ state: 'visible', timeout: 60_000 });
+  private tabAccessibleNamePattern(name: FundTab): RegExp {
+    return new RegExp(`^${escapeRegExp(name)}$`, 'i');
+  }
+
+  /**
+   * Locator for the tabpanel whose accessible name matches the fund tab label.
+   *
+   * Prefer this (with {@link clickTab}) over “first visible tabpanel”, which can resolve to the wrong panel
+   * if the UI did not finish switching tabs.
+   */
+  tabPanelFor(name: FundTab): Locator {
+    return this.page.getByRole('tabpanel', { name: this.tabAccessibleNamePattern(name) });
+  }
+
+  /**
+   * Resolves the active tab’s panel after a click.
+   *
+   * Primary: `tabpanel` role + same accessible name as the tab. Fallback: `#aria-controls` when the tab exposes it.
+   */
+  private async resolveTabPanelAfterClick(name: FundTab, tab: Locator): Promise<Locator> {
+    const byRole = this.tabPanelFor(name);
+    try {
+      await expect(byRole).toBeVisible({ timeout: 60_000 });
+      return byRole;
+    } catch {
+      const controlsId = await tab.getAttribute('aria-controls');
+      if (!controlsId?.trim()) {
+        throw new Error(
+          `Could not resolve tabpanel for "${name}": tabpanel role lookup timed out and tab has no aria-controls.`,
+        );
+      }
+      const panel = locatorById(this.page, controlsId.trim());
+      await expect(panel).toBeVisible({ timeout: 60_000 });
+      return panel;
+    }
+  }
+
+  /**
+   * Clicks a fund tab, asserts it is selected, and waits for that tab’s panel — not merely “some” visible panel.
+   *
+   * @returns Locator scoped to the tabpanel for `name` once selection is confirmed.
+   */
+  async clickTab(name: FundTab): Promise<Locator> {
+    const tab = this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) });
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
+    return await this.resolveTabPanelAfterClick(name, tab);
   }
 
   /** Asserts that the given tab does not exist for the current product. */
   async assertTabAbsent(name: FundTab): Promise<void> {
-    await expect(this.page.getByRole('tab', { name: new RegExp(name, 'i') })).toHaveCount(0);
-  }
-
-  /**
-   * Returns the first visible tabpanel.
-   *
-   * Playwright's role locator can see multiple tabpanels in the DOM; we only use the visible one.
-   */
-  get visibleTabpanel(): Locator {
-    return this.page.getByRole('tabpanel').filter({ visible: true }).first();
+    await expect(this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) })).toHaveCount(0);
   }
 
   /** All HTML tables under a scope that have `<tbody>` rows — no blank body cells. */
@@ -155,9 +205,10 @@ export class FundPage {
 
   /**
    * Outcome tab: asserts that the “Data from …” stamp matches the expected as-of behavior.
+   *
+   * @param panel — Must be the Outcome tab’s panel (e.g. return value of {@link clickTab}(`'Outcome period details'`)).
    */
-  async assertOutcomePeriodDateSignals(): Promise<void> {
-    const panel = this.visibleTabpanel;
+  async assertOutcomePeriodDateSignals(panel: Locator): Promise<void> {
     const text = await panel.innerText();
 
     const dataFrom = text.match(/Data from (\d{1,2}\/\d{1,2}\/\d{4})/i);
@@ -172,12 +223,13 @@ export class FundPage {
   /**
    * Clicks the "Download chart data (CSV)" link and returns the local temp file path.
    *
+   * @param panel — Active Outcome tabpanel scope (same as used for {@link assertOutcomePeriodDateSignals}).
    * The caller is responsible for reading and deleting the temp file if needed.
    */
-  async downloadOutcomeChartCsv(): Promise<string> {
+  async downloadOutcomeChartCsv(panel: Locator): Promise<string> {
     const [download] = await Promise.all([
       this.page.waitForEvent('download'),
-      this.visibleTabpanel
+      panel
         .getByRole('link', { name: /Download chart data \(CSV\)/i })
         .first()
         .click(),
@@ -215,8 +267,7 @@ export class FundPage {
    * The page has different UI shapes for FoF vs non-FoF tickers, so expectations differ.
    */
   async assertHoldingsTab(ticker: string): Promise<void> {
-    await this.clickTab('Holdings');
-    const panel = this.visibleTabpanel;
+    const panel = await this.clickTab('Holdings');
     const text = await panel.innerText();
 
     if (TICKERS_FOF.includes(ticker as (typeof TICKERS_FOF)[number])) {
@@ -257,8 +308,7 @@ export class FundPage {
   async assertPerformanceTab(ticker: string): Promise<void> {
     if (PERFORMANCE_SKIP_TICKERS.includes(ticker as (typeof PERFORMANCE_SKIP_TICKERS)[number])) return;
 
-    await this.clickTab('Performance');
-    const panel = this.visibleTabpanel;
+    const panel = await this.clickTab('Performance');
     const text = await panel.innerText();
 
     const asOf = text.match(/\bAs of\s+(\d{1,2}\/\d{1,2}\/\d{4})\b/i);
@@ -277,8 +327,7 @@ export class FundPage {
    * Overview/Documents tabs: asserts the tab renders meaningful text and is not an error page.
    */
   async assertOverviewOrDocumentsTab(tabName: 'Overview' | 'Documents'): Promise<void> {
-    await this.clickTab(tabName);
-    const panel = this.visibleTabpanel;
+    const panel = await this.clickTab(tabName);
     await expect(panel).toBeVisible();
     const text = await panel.innerText();
     expect(text.trim().length, `${tabName} tab should show meaningful content`).toBeGreaterThan(120);

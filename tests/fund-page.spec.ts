@@ -51,16 +51,17 @@ test.describe('Fund page @smoke', () => {
 
       if (hasOutcome) {
         await test.step("3. Outcome period details — chart + table dates; no empty data cells", async () => {
-          await fund.clickTab('Outcome period details');
-          await fund.assertOutcomePeriodDateSignals();
+          const outcomePanel = await fund.clickTab('Outcome period details');
+          await fund.assertOutcomePeriodDateSignals(outcomePanel);
           await fund.assertAllDataTablesFilled(
-            fund.visibleTabpanel,
+            outcomePanel,
             'Outcome period details (tables under chart)',
           );
         });
 
         await test.step('4. Outcome period — download chart CSV; ≥1 row for previous U.S. working day', async () => {
-          const p = await fund.downloadOutcomeChartCsv();
+          const outcomePanel = await fund.clickTab('Outcome period details');
+          const p = await fund.downloadOutcomeChartCsv(outcomePanel);
           fund.assertOutcomeChartCsvHasRowForPreviousWorkingDay(p);
         });
       } else {
