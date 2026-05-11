@@ -24,16 +24,6 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Builds a locator for an element by HTML `id`, safe for arbitrary IDs (e.g. React `useId()` with `:`).
- *
- * Uses an attribute selector so we do not depend on `#id` CSS escaping rules.
- */
-function locatorById(page: Page, id: string): Locator {
-  const escaped = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return page.locator(`[id="${escaped}"]`);
-}
-
-/**
  * Returns whether it is currently Saturday/Sunday in New York time.
  *
  * Used to widen expected date matching for exports that may lag over the weekend.
@@ -143,26 +133,55 @@ export class FundPage {
   }
 
   /**
-   * Resolves the active tab’s panel after a click.
+   * Locator for the in-tab title the site shows when that section is active (user-visible proof of tab switch).
    *
-   * Primary: `tabpanel` role + same accessible name as the tab. Fallback: `#aria-controls` when the tab exposes it.
+   * Prefer this over `toBeVisible` on Elementor `aria-controls` wrappers, which can stay `hidden` while the tab
+   * is already `aria-selected`. Uses flexible text/regex (whitespace, `&` vs entity) and `h2` / `span` as on prod.
+   * Holdings: FoF pages may omit `h2.tab__title`; a `heading` role fallback matches the same visible title.
    */
-  private async resolveTabPanelAfterClick(name: FundTab, tab: Locator): Promise<Locator> {
-    const byRole = this.tabPanelFor(name);
-    try {
-      await expect(byRole).toBeVisible({ timeout: 60_000 });
-      return byRole;
-    } catch {
-      const controlsId = await tab.getAttribute('aria-controls');
-      if (!controlsId?.trim()) {
-        throw new Error(
-          `Could not resolve tabpanel for "${name}": tabpanel role lookup timed out and tab has no aria-controls.`,
-        );
-      }
-      const panel = locatorById(this.page, controlsId.trim());
-      await expect(panel).toBeVisible({ timeout: 60_000 });
+  private tabContentMarker(name: FundTab): Locator {
+    switch (name) {
+      case 'Outcome period details':
+        return this.page
+          .locator('span.opd-title__text')
+          .filter({ hasText: /Outcome\s+Period\s+Details/i });
+      case 'Overview':
+        return this.page.locator('h2.tab__title').filter({ hasText: /^\s*ETF Summary\s*$/i });
+      case 'Performance':
+        return this.page
+          .locator('h2.tab__title')
+          .filter({ hasText: /ETF Performance\s*[&＆]?\s*Index History/i });
+      case 'Holdings':
+        // Non-FoF uses `h2.tab__title`; FoF holdings can use a plain heading without that class.
+        return this.page
+          .locator('h2.tab__title')
+          .filter({ hasText: /^\s*Holdings\s*$/i })
+          .or(this.page.getByRole('heading', { name: /^\s*Holdings\s*$/i }));
+      case 'Documents':
+        return this.page.locator('h2.tab__title').filter({ hasText: /^\s*Documents\s*$/i });
+    }
+  }
+
+  /**
+   * After the tab is selected, waits for that tab’s section title and returns a `tabpanel` scope for assertions.
+   *
+   * Resolution order: tabpanel that **contains** the visible marker (best for Elementor), else role+name tabpanel.
+   */
+  private async resolveTabPanelAfterClick(name: FundTab): Promise<Locator> {
+    const marker = this.tabContentMarker(name);
+    const markerFirst = marker.first();
+    await expect(markerFirst, `Tab "${name}" should show its section title`).toBeVisible({ timeout: 60_000 });
+
+    const panelWithMarker = this.page.getByRole('tabpanel').filter({ has: markerFirst });
+    if ((await panelWithMarker.count()) > 0) {
+      const panel = panelWithMarker.first();
+      await expect(panel, `tabpanel containing "${name}" marker`).toBeVisible({ timeout: 15_000 });
       return panel;
     }
+
+    const byRole = this.tabPanelFor(name);
+    await expect(byRole, `tabpanel for "${name}" (by accessible name)`).toBeVisible({ timeout: 15_000 });
+    return byRole;
   }
 
   /**
@@ -174,7 +193,7 @@ export class FundPage {
     const tab = this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) });
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
-    return await this.resolveTabPanelAfterClick(name, tab);
+    return await this.resolveTabPanelAfterClick(name);
   }
 
   /** Asserts that the given tab does not exist for the current product. */
