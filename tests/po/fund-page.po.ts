@@ -187,9 +187,13 @@ export class FundPage {
   /**
    * Clicks a fund tab, asserts it is selected, and waits for that tab’s panel — not merely “some” visible panel.
    *
+   * Waits **3s** after the current view has settled before clicking, so Elementor / async tab strips are less likely
+   * to ignore the first click (CI flake mitigation).
+   *
    * @returns Locator scoped to the tabpanel for `name` once selection is confirmed.
    */
   async clickTab(name: FundTab): Promise<Locator> {
+    await this.page.waitForTimeout(3_000);
     const tab = this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) });
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });

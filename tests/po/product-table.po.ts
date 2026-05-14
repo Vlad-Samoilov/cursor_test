@@ -103,6 +103,9 @@ export class ProductTablePage {
    * Opens the specified tab and waits for the table to re-render.
    *
    * Callers typically use this before reading "as of" stamps or validating cells.
+   *
+   * Before a **tab change** (actual click), waits **3s** so the product table shell is stable and the first click
+   * is less likely to be dropped (CI / Elementor timing).
    */
   async openTab(name: ProductTableTab): Promise<void> {
     const tab = this.page.getByRole('tab', { name });
@@ -113,6 +116,7 @@ export class ProductTablePage {
       return;
     }
 
+    await this.page.waitForTimeout(3_000);
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
     const panelId = await tab.getAttribute('aria-controls').catch(() => null);
