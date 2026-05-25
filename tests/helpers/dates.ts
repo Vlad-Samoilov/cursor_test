@@ -253,11 +253,41 @@ export function assertUsMdyMatchesExpected(
 }
 
 /**
+ * Views that roll to "today" after the intraday publish window (09:50 ET), but stay on the
+ * previous working day all day on US holiday weekdays (no intraday values published).
+ */
+function expectedIntradayRollWithHolidayClosure(
+  viewName: string,
+  weekendTolerance: boolean,
+): ExpectedUsMdy {
+  if (isUsHolidayClosureTodayET()) {
+    return expectedUsMdyExact(
+      previousWorkingDayET_usMdy_n(1),
+      `US holiday: no intraday publish; ${viewName} stays on previous working day.`,
+    );
+  }
+  if (currentAsOfPublishWindowET() === 'after_window') {
+    return expectedUsMdyExact(todayET_usMdy(), `After intraday publish window, ${viewName} rolls to today.`);
+  }
+  if (weekendTolerance && isWeekendET()) {
+    return expectedUsMdyOneOf(
+      [previousWorkingDayET_usMdy_n(1), previousWorkingDayET_usMdy_n(2)],
+      `Weekend tolerance: during early window, ${viewName} can lag by one extra working day.`,
+    );
+  }
+  return expectedUsMdyExact(
+    previousWorkingDayET_usMdy_n(1),
+    `During early window, ${viewName} shows previous working day.`,
+  );
+}
+
+/**
  * Centralized business rules for "as of" expectations across different pages/views.
  *
  * These are intentionally time-dependent in America/New_York and account for:
  * - weekend tolerance where feeds can lag
  * - intraday publish windows (some views roll to "today" after a time cutoff)
+ * - US holiday weekdays without intraday publish (those views stay on previous working day)
  * - performance month-end snapshot behavior
  */
 export const expectedAsOf = {
@@ -271,14 +301,7 @@ export const expectedAsOf = {
         : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'Overview & Fees stays on previous working day.');
     },
     characteristicsUi(): ExpectedUsMdy {
-      return currentAsOfPublishWindowET() === 'after_window'
-        ? expectedUsMdyExact(todayET_usMdy(), 'After intraday publish window, Characteristics rolls to today.')
-        : isWeekendET()
-          ? expectedUsMdyOneOf(
-              [previousWorkingDayET_usMdy_n(1), previousWorkingDayET_usMdy_n(2)],
-              'Weekend tolerance: during early window, Characteristics can lag by one extra working day.',
-            )
-          : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'During early window, Characteristics shows previous working day.');
+      return expectedIntradayRollWithHolidayClosure('Characteristics', true);
     },
     characteristicsCsv(): ExpectedUsMdy {
       return this.characteristicsUi();
@@ -300,14 +323,7 @@ export const expectedAsOf = {
         : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'ETF Market Data stays on previous working day.');
     },
     outcomeUi(): ExpectedUsMdy {
-      return currentAsOfPublishWindowET() === 'after_window'
-        ? expectedUsMdyExact(todayET_usMdy(), 'After intraday publish window, Outcome UI rolls to today.')
-        : isWeekendET()
-          ? expectedUsMdyOneOf(
-              [previousWorkingDayET_usMdy_n(1), previousWorkingDayET_usMdy_n(2)],
-              'Weekend tolerance: during early window, Outcome UI can lag by one extra working day.',
-            )
-          : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'During early window, Outcome UI shows previous working day.');
+      return expectedIntradayRollWithHolidayClosure('Outcome UI', true);
     },
     holdingsUi(): ExpectedUsMdy {
       return isUsHolidayClosureTodayET()
@@ -318,9 +334,7 @@ export const expectedAsOf = {
         : expectedUsMdyExact(todayET_usMdy(), 'Holdings table shows today (FoF and non-FoF).');
     },
     holdingsFofChartStamp(): ExpectedUsMdy {
-      return currentAsOfPublishWindowET() === 'after_window'
-        ? expectedUsMdyExact(todayET_usMdy(), 'After 09:50 ET, FoF holdings chart stamp is today.')
-        : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'Before 09:50 ET, FoF holdings chart stamp is previous working day.');
+      return expectedIntradayRollWithHolidayClosure('FoF holdings chart stamp', false);
     },
     performanceUi(): ExpectedUsMdy {
       return expectedUsMdyExact(

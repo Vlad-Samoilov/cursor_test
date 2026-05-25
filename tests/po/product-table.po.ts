@@ -99,31 +99,102 @@ export class ProductTablePage {
     }
   }
 
+  /** Exact accessible-name match for a product-table tab (case-insensitive). */
+  private tabAccessibleNamePattern(name: ProductTableTab): RegExp {
+    return new RegExp(`^${escapeRegExp(name)}$`, 'i');
+  }
+
+  /**
+   * User-visible proof that a product-table tab finished loading (prefer over `aria-selected` alone).
+   *
+   * Characteristics exposes a stable less/more list (`#rd-tbg_pt-characteristics_lessMore`) when that tab is active.
+   */
+  private tabContentMarker(name: ProductTableTab): Locator {
+    switch (name) {
+      case 'Characteristics':
+        return this.page.locator('#rd-tbg_pt-characteristics_lessMore');
+      default:
+        return this.page.getByRole('tabpanel', { name: this.tabAccessibleNamePattern(name) });
+    }
+  }
+
+  /** Whether the tab’s content marker is already visible (tab fully switched). */
+  private async isTabContentOpen(name: ProductTableTab): Promise<boolean> {
+    return await this.tabContentMarker(name)
+      .first()
+      .isVisible()
+      .catch(() => false);
+  }
+
+  /**
+   * Waits for the tab’s content marker and returns the `tabpanel` scope that contains it.
+   *
+   * Mirrors fund-page tab resolution: Elementor can set `aria-selected` before the panel content appears.
+   */
+  private async resolveTabPanelAfterClick(name: ProductTableTab): Promise<Locator> {
+    const marker = this.tabContentMarker(name);
+    const markerFirst = marker.first();
+    await expect(markerFirst, `Tab "${name}" should show its content marker`).toBeVisible({ timeout: 60_000 });
+
+    const panelWithMarker = this.page.getByRole('tabpanel').filter({ has: markerFirst });
+    if ((await panelWithMarker.count()) > 0) {
+      const panel = panelWithMarker.first();
+      await expect(panel, `tabpanel containing "${name}" marker`).toBeVisible({ timeout: 15_000 });
+      return panel;
+    }
+
+    const byRole = this.page.getByRole('tabpanel', { name: this.tabAccessibleNamePattern(name) });
+    await expect(byRole.first(), `tabpanel for "${name}" (by accessible name)`).toBeVisible({ timeout: 15_000 });
+    return byRole.first();
+  }
+
   /**
    * Opens the specified tab and waits for the table to re-render.
    *
    * Callers typically use this before reading "as of" stamps or validating cells.
    *
    * Before a **tab change** (actual click), waits **3s** so the product table shell is stable and the first click
-   * is less likely to be dropped (CI / Elementor timing).
+   * is less likely to be dropped (CI / Elementor timing). Success is defined by the tab content marker, not only
+   * `aria-selected`.
    */
   async openTab(name: ProductTableTab): Promise<void> {
-    const tab = this.page.getByRole('tab', { name });
-    const alreadySelected = await tab.getAttribute('aria-selected').catch(() => null);
-    if (String(alreadySelected).toLowerCase() === 'true') {
-      await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+    await this.dismissCookieBannerIfPresent();
+
+    if (await this.isTabContentOpen(name)) {
+      const panel = await this.resolveTabPanelAfterClick(name);
+      await panel.getByRole('table').first().waitFor({ state: 'visible', timeout: 60_000 });
       await this.dismissCookieBannerIfPresent();
       return;
     }
 
+    const tab = this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) });
     await this.page.waitForTimeout(3_000);
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
-    const panelId = await tab.getAttribute('aria-controls').catch(() => null);
-    if (panelId) {
-      await this.page.locator(`#${panelId}`).waitFor({ state: 'visible', timeout: 60_000 });
+
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.dismissCookieBannerIfPresent();
+      await tab.scrollIntoViewIfNeeded().catch(() => {});
+      await tab.click({ timeout: 15_000 });
+
+      // Best-effort: Elementor may lag `aria-selected` while the panel is already switching.
+      await expect(tab)
+        .toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+        .catch(() => {});
+
+      if (await this.isTabContentOpen(name)) {
+        const panel = await this.resolveTabPanelAfterClick(name);
+        await panel.getByRole('table').first().waitFor({ state: 'visible', timeout: 60_000 });
+        await this.dismissCookieBannerIfPresent();
+        return;
+      }
+
+      if (attempt < maxAttempts) {
+        await this.page.waitForTimeout(2_000);
+      }
     }
-    await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+
+    const panel = await this.resolveTabPanelAfterClick(name);
+    await panel.getByRole('table').first().waitFor({ state: 'visible', timeout: 60_000 });
     await this.dismissCookieBannerIfPresent();
   }
 
