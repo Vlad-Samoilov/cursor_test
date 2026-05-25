@@ -304,7 +304,7 @@ export class FundPage {
       await this.assertAllDataTablesFilled(panel, 'Holdings tab (FoF) tables');
 
       const chartExpected = expectedAsOf.fund.holdingsFofChartStamp();
-      // The FoF holdings view contains TWO "Data as of" stamps: one above the holdings table (today),
+      // The FoF holdings view contains TWO "Data as of" stamps: one above the holdings table (holdingsUi),
       // and another for the chart. We want the chart one — empirically it appears later in the panel.
       const stamps = panel.getByText(/Data as of\s+\d{1,2}\/\d{1,2}\/\d{4}/i);
       const sn = await stamps.count();

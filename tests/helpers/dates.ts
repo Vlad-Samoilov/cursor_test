@@ -85,6 +85,21 @@ export function previousWorkingDayET_usMdy(): string {
   throw new Error('Could not resolve previous working day within 366 days');
 }
 
+/**
+ * First US working day strictly after **today’s** calendar date in America/New_York.
+ * Skips weekends and US `public` / `bank` holidays.
+ */
+export function nextWorkingDayET_usMdy(): string {
+  let cur = DateTime.now().setZone(NY_TZ).startOf('day').plus({ days: 1 });
+  for (let i = 0; i < 366; i++) {
+    if (isUsWorkingDayET(cur.year, cur.month, cur.day)) {
+      return `${cur.month}/${cur.day}/${cur.year}`;
+    }
+    cur = cur.plus({ days: 1 });
+  }
+  throw new Error('Could not resolve next working day within 366 days');
+}
+
 /** Previous US working day N times back (N=1 equals `previousWorkingDayET_usMdy()`). */
 export function previousWorkingDayET_usMdy_n(n: number): string {
   if (!Number.isFinite(n) || n < 1) throw new Error(`n must be >= 1, got ${n}`);
@@ -102,6 +117,17 @@ export function previousWorkingDayET_usMdy_n(n: number): string {
 /** Today's calendar date in America/New_York as `M/D/YYYY` (no leading zeros). */
 export function todayET_usMdy(): string {
   return formatUsMdy(todayPartsET());
+}
+
+/**
+ * Whether **today** in America/New_York is a weekday closed by a US `public` / `bank` holiday.
+ * Weekends are excluded (handled separately elsewhere when needed).
+ */
+export function isUsHolidayClosureTodayET(): boolean {
+  const { y, m, d } = todayPartsET();
+  const wd = DateTime.fromObject({ year: y, month: m, day: d }, { zone: NY_TZ }).weekday;
+  if (wd === 6 || wd === 7) return false;
+  return !isUsWorkingDayET(y, m, d);
 }
 
 /** Last calendar day of the month preceding the current month in America/New_York. */
@@ -284,7 +310,12 @@ export const expectedAsOf = {
           : expectedUsMdyExact(previousWorkingDayET_usMdy_n(1), 'During early window, Outcome UI shows previous working day.');
     },
     holdingsUi(): ExpectedUsMdy {
-      return expectedUsMdyExact(todayET_usMdy(), 'Holdings table shows today (FoF and non-FoF).');
+      return isUsHolidayClosureTodayET()
+        ? expectedUsMdyExact(
+            nextWorkingDayET_usMdy(),
+            'Holdings table on a US holiday shows the next working day (FoF and non-FoF).',
+          )
+        : expectedUsMdyExact(todayET_usMdy(), 'Holdings table shows today (FoF and non-FoF).');
     },
     holdingsFofChartStamp(): ExpectedUsMdy {
       return currentAsOfPublishWindowET() === 'after_window'
