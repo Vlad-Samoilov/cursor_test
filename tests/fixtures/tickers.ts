@@ -73,6 +73,7 @@ export const TICKERS_BUFFER_UNCAPPED = [
   'MAYU',
   'JNEU',
   'JULU',
+  'JULI',
   'AUGU',
   'SEPU',
   'OCTU',
