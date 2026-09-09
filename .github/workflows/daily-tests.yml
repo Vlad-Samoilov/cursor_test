@@ -83,7 +83,7 @@ jobs:
           SMTP_PORT: "587"
           SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
           SMTP_PASS: ${{ secrets.GMAIL_SMTP_PASS }}
-          MAIL_TO: vladislav.samoylov@dataart.com
+          MAIL_TO: vladislav.samoylov@dataart.com, Sergey.Kravchenko@dataart.com
           SUBJECT_PREFIX: "[Allianz smoke daily tests]"
         run: node scripts/send-smtp-report.mjs
 
