@@ -55,8 +55,24 @@ export type FundTab =
  * - download and validate CSV exports (chart/table)
  */
 export class FundPage {
+  /** Best-effort cookie/banner dismiss link (can intercept tab clicks). */
+  readonly cookieDismiss: Locator;
+
   /** Creates a page object bound to the provided Playwright `Page`. */
-  constructor(readonly page: Page) {}
+  constructor(readonly page: Page) {
+    this.cookieDismiss = page.getByRole('link', { name: /dismiss/i }).first();
+  }
+
+  /**
+   * Dismisses the cookie banner if it is visible.
+   *
+   * The banner can intercept clicks, so tab switches call this defensively.
+   */
+  private async dismissCookieBannerIfPresent(): Promise<void> {
+    if (await this.cookieDismiss.isVisible().catch(() => false)) {
+      await this.cookieDismiss.click({ timeout: 5_000 }).catch(() => {});
+    }
+  }
 
   /**
    * Reads the first visible "Data as of M/D/YYYY" label within a panel and returns the date.
@@ -136,8 +152,8 @@ export class FundPage {
    * Locator for the in-tab title the site shows when that section is active (user-visible proof of tab switch).
    *
    * Prefer this over `toBeVisible` on Elementor `aria-controls` wrappers, which can stay `hidden` while the tab
-   * is already `aria-selected`. Uses flexible text/regex (whitespace, `&` vs entity) and `h2` / `span` as on prod.
-   * Holdings: FoF pages may omit `h2.tab__title`; a `heading` role fallback matches the same visible title.
+   * is already `aria-selected`. Uses `.tab__title` (any heading level) because FoF Holdings is `h1.tab__title`
+   * after the 2026 release while other tabs remain `h2.tab__title`.
    */
   private tabContentMarker(name: FundTab): Locator {
     switch (name) {
@@ -146,20 +162,28 @@ export class FundPage {
           .locator('span.opd-title__text')
           .filter({ hasText: /Outcome\s+Period\s+Details/i });
       case 'Overview':
-        return this.page.locator('h2.tab__title').filter({ hasText: /^\s*ETF Summary\s*$/i });
+        return this.page.locator('.tab__title').filter({ hasText: /^\s*ETF Summary\s*$/i });
       case 'Performance':
         return this.page
-          .locator('h2.tab__title')
+          .locator('.tab__title')
           .filter({ hasText: /ETF Performance\s*[&＆]?\s*Index History/i });
       case 'Holdings':
-        // Non-FoF uses `h2.tab__title`; FoF holdings can use a plain heading without that class.
+        // FoF: `h1.tab__title` + `#holdings-table`. Non-FoF: `h2.tab__title`. Hidden panels are excluded via visibility.
         return this.page
-          .locator('h2.tab__title')
+          .locator('.tab__title')
           .filter({ hasText: /^\s*Holdings\s*$/i })
-          .or(this.page.getByRole('heading', { name: /^\s*Holdings\s*$/i }));
+          .or(this.page.locator('#holdings-table'));
       case 'Documents':
-        return this.page.locator('h2.tab__title').filter({ hasText: /^\s*Documents\s*$/i });
+        return this.page.locator('.tab__title').filter({ hasText: /^\s*Documents\s*$/i });
     }
+  }
+
+  /** Whether the tab’s content marker is already visible (tab fully switched). */
+  private async isTabContentOpen(name: FundTab): Promise<boolean> {
+    return await this.tabContentMarker(name)
+      .first()
+      .isVisible()
+      .catch(() => false);
   }
 
   /**
@@ -185,18 +209,44 @@ export class FundPage {
   }
 
   /**
-   * Clicks a fund tab, asserts it is selected, and waits for that tab’s panel — not merely “some” visible panel.
+   * Clicks a fund tab and waits for that tab’s content marker — not merely `aria-selected` or “some” visible panel.
    *
-   * Waits **3s** after the current view has settled before clicking, so Elementor / async tab strips are less likely
-   * to ignore the first click (CI flake mitigation).
+   * Elementor can drop the first click (`[active]` without `[selected]`), so we retry. Cookie banners are dismissed
+   * first because they intercept pointer events. Success is the visible section title / holdings table, matching
+   * Product Table tab switching.
    *
    * @returns Locator scoped to the tabpanel for `name` once selection is confirmed.
    */
   async clickTab(name: FundTab): Promise<Locator> {
-    await this.page.waitForTimeout(3_000);
+    await this.dismissCookieBannerIfPresent();
+
+    if (await this.isTabContentOpen(name)) {
+      return await this.resolveTabPanelAfterClick(name);
+    }
+
     const tab = this.page.getByRole('tab', { name: this.tabAccessibleNamePattern(name) });
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
+    await this.page.waitForTimeout(3_000);
+
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.dismissCookieBannerIfPresent();
+      await tab.scrollIntoViewIfNeeded().catch(() => {});
+      await tab.click({ timeout: 15_000 });
+
+      // Best-effort: Elementor may lag `aria-selected` while the panel is already switching.
+      await expect(tab)
+        .toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+        .catch(() => {});
+
+      if (await this.isTabContentOpen(name)) {
+        return await this.resolveTabPanelAfterClick(name);
+      }
+
+      if (attempt < maxAttempts) {
+        await this.page.waitForTimeout(2_000);
+      }
+    }
+
     return await this.resolveTabPanelAfterClick(name);
   }
 
