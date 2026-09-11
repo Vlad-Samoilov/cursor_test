@@ -206,10 +206,21 @@ export class ProductTablePage {
   async openFundPageFromOverviewFees(ticker: string): Promise<void> {
     await this.goto();
     await this.openTab('Overview & Fees');
-    // Prefer the ticker link within the table itself to avoid matching unrelated nav/marketing links.
-    await this.mainTable.getByRole('link', { name: new RegExp(`^${escapeRegExp(ticker)}$`, 'i') }).first().click();
-    await this.page.waitForURL(new RegExp(`/etfs/${ticker.toLowerCase()}`, 'i'), { timeout: 60_000 });
-  }
+    
+    const link = this.mainTable
+    .getByRole('link', { name: new RegExp(`^${escapeRegExp(ticker)}$`, 'i') })
+    .first();
+
+  await expect(link, `ticker link "${ticker}" should be visible`).toBeVisible({ timeout: 30_000 });
+
+  await Promise.all([
+    this.page.waitForURL(
+      (url) => url.pathname.toLowerCase().includes(`/etfs/${ticker.toLowerCase()}`),
+      { timeout: 60_000 }
+    ),
+    link.click(),
+  ]);
+}
 
   /** Ticker symbols from the sticky first column (`th[scope="row"]`). */
   async collectTickerSymbols(): Promise<string[]> {
