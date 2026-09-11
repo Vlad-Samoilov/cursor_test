@@ -56,11 +56,7 @@ export const TICKERS_BUFFER100 = ['AIOO'] as const;
 /** Fund-of-Funds tickers (FoF UI differs from standard fund pages). */
 export const TICKERS_FOF = ['SPBU', 'SPBX', 'SPBW'] as const;
 
-/**
- * Temporary: these are newly launched funds whose Performance tab may be blank/missing until May 1st.
- * We skip Performance-tab assertions for these tickers (both Product Table and Fund page).
- */
-export const PERFORMANCE_SKIP_TICKERS = ['QBSV', 'QBQF', 'QBQV', 'QBIF', 'QBIV', 'QBKV', 'QBKF', 'ARLI'] as const;
+
 
 /** "Buffer Uncapped" strategy tickers. */
 export const TICKERS_BUFFER_UNCAPPED = [

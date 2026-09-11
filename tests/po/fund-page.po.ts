@@ -9,7 +9,7 @@ import {
   previousWorkingDayET_usMdy_n,
   todayET_usMdy,
 } from '../helpers/dates';
-import { PERFORMANCE_SKIP_TICKERS, TICKERS_FOF } from '../fixtures/tickers';
+import { TICKERS_FOF } from '../fixtures/tickers';
 import { splitCsvLine } from '../helpers/characteristics-csv';
 import { readVisibleDataAsOfUsMdy } from '../helpers/ui-asof';
 import { assertNoEmptyTbodyCells } from '../helpers/table-asserts';
@@ -379,7 +379,6 @@ export class FundPage {
    * Some tickers are excluded due to known UI differences.
    */
   async assertPerformanceTab(ticker: string): Promise<void> {
-    if (PERFORMANCE_SKIP_TICKERS.includes(ticker as (typeof PERFORMANCE_SKIP_TICKERS)[number])) return;
 
     const panel = await this.clickTab('Performance');
     const text = await panel.innerText();
