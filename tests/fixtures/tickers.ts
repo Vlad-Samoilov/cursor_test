@@ -73,6 +73,7 @@ export const TICKERS_BUFFER_UNCAPPED = [
   'AUGU',
   'SEPU',
   'OCTU',
+  'OCTI',
   'NVBU',
   'DECU',
 ] as const;
