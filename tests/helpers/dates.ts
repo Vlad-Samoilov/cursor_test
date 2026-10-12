@@ -1,11 +1,98 @@
-import Holidays from 'date-holidays';
 import { DateTime } from 'luxon';
 
 /** IANA timezone identifier used for "ET" expectations in tests. */
 const NY_TZ = 'America/New_York';
 
-/** US holiday calendar used to decide whether a working day is "open". */
-const hd = new Holidays('US');
+/**
+ * NYSE **full-day** closures (`YYYY-MM-DD`), from the published NYSE / ICE holiday calendars.
+ *
+ * This is **not** the US federal holiday list. Differences that matter for ETF as-of dates:
+ * - NYSE is closed on **Good Friday**; the federal calendar is not.
+ * - NYSE is **open** on Columbus Day / Indigenous Peoples’ Day and Veterans Day.
+ * - Weekend holidays use NYSE observed dates (e.g. Independence Day 2026 → Friday 7/3).
+ *
+ * Early closes (day after Thanksgiving, Christmas Eve when applicable) are **not** listed —
+ * the market still trades, so they are treated as working days.
+ *
+ * Sources: https://www.nyse.com/markets/hours-calendars and ICE NYSE Group holiday press releases.
+ * Extend this set when NYSE publishes later years.
+ */
+const NYSE_FULL_DAY_CLOSURES = new Set<string>([
+  // 2024 (ICE NYSE Group holiday calendar)
+  '2024-01-01',
+  '2024-01-15',
+  '2024-02-19',
+  '2024-03-29',
+  '2024-05-27',
+  '2024-06-19',
+  '2024-07-04',
+  '2024-09-02',
+  '2024-11-28',
+  '2024-12-25',
+  // 2025
+  '2025-01-01',
+  '2025-01-20',
+  '2025-02-17',
+  '2025-04-18',
+  '2025-05-26',
+  '2025-06-19',
+  '2025-07-04',
+  '2025-09-01',
+  '2025-11-27',
+  '2025-12-25',
+  // 2026
+  '2026-01-01',
+  '2026-01-19',
+  '2026-02-16',
+  '2026-04-03',
+  '2026-05-25',
+  '2026-06-19',
+  '2026-07-03',
+  '2026-09-07',
+  '2026-11-26',
+  '2026-12-25',
+  // 2027
+  '2027-01-01',
+  '2027-01-18',
+  '2027-02-15',
+  '2027-03-26',
+  '2027-05-31',
+  '2027-06-18',
+  '2027-07-05',
+  '2027-09-06',
+  '2027-11-25',
+  '2027-12-24',
+  // 2028 (Jan 1 falls on Saturday — NYSE does not observe an extra New Year’s Day close)
+  '2028-01-17',
+  '2028-02-21',
+  '2028-04-14',
+  '2028-05-29',
+  '2028-06-19',
+  '2028-07-04',
+  '2028-09-04',
+  '2028-11-23',
+  '2028-12-25',
+]);
+
+/** Years covered by {@link NYSE_FULL_DAY_CLOSURES}; used to fail loudly if the table is stale. */
+const NYSE_CALENDAR_YEARS = new Set(
+  [...NYSE_FULL_DAY_CLOSURES].map((iso) => Number(iso.slice(0, 4))),
+);
+
+/**
+ * Returns whether the given ET calendar date is an NYSE full-day closure.
+ *
+ * Throws if `year` is outside the hardcoded calendar so tests cannot silently treat unknown years as open.
+ */
+function isNyseFullDayClosure(y: number, m: number, d: number): boolean {
+  if (!NYSE_CALENDAR_YEARS.has(y)) {
+    throw new Error(
+      `NYSE holiday calendar has no entries for ${y}. Add full-day closures from https://www.nyse.com/markets/hours-calendars.`,
+    );
+  }
+  const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return NYSE_FULL_DAY_CLOSURES.has(iso);
+}
 
 /**
  * Returns today's calendar date parts in America/New_York.
@@ -34,45 +121,18 @@ export function formatUsMdy(parts: { y: number; m: number; d: number }): string 
 }
 
 /**
- * Minimal subset of the `date-holidays` holiday record we care about.
- *
- * The library can return a single rule or a list of rules for a given date.
- */
-type HolidayRule = { type?: string; name?: string };
-
-/**
- * Returns whether a holiday rule should be treated as closing the working day.
- *
- * We only consider `public` and `bank` days as closures and intentionally ignore
- * observance-only events like Easter for these checks.
- */
-function holidayClosesWorkingDay(rule: HolidayRule): boolean {
-  const t = rule.type ?? '';
-  if (t !== 'public' && t !== 'bank') return false;
-  const n = String(rule.name ?? '').toLowerCase();
-  // Easter is not treated as a US non-working day for these checks (and is usually `observance` anyway).
-  if (n.includes('easter')) return false;
-  return true;
-}
-
-/**
- * Monday–Friday in New York **and** not a US federal-style holiday (`public` / `bank` in `date-holidays`).
- * Observance-only days (e.g. Easter Sunday) do not close the working day.
+ * Monday–Friday in New York **and** not an NYSE full-day closure (see {@link NYSE_FULL_DAY_CLOSURES}).
  */
 export function isUsWorkingDayET(y: number, m: number, d: number): boolean {
   const dt = DateTime.fromObject({ year: y, month: m, day: d }, { zone: NY_TZ }).set({ hour: 12 });
   const wd = dt.weekday; // 1 = Mon … 7 = Sun
   if (wd === 6 || wd === 7) return false;
-
-  const raw = hd.isHoliday(dt.toJSDate());
-  if (!raw) return true;
-  const rules: HolidayRule[] = Array.isArray(raw) ? raw : [raw as HolidayRule];
-  return !rules.some(holidayClosesWorkingDay);
+  return !isNyseFullDayClosure(y, m, d);
 }
 
 /**
- * Last US working day strictly before **today’s** calendar date in America/New_York.
- * Skips weekends and US `public` / `bank` holidays (not observance-only days such as Easter).
+ * Last US **equity-market** working day strictly before **today’s** calendar date in America/New_York.
+ * Skips weekends and NYSE full-day closures.
  */
 export function previousWorkingDayET_usMdy(): string {
   let cur = DateTime.now().setZone(NY_TZ).minus({ days: 1 }).startOf('day');
@@ -87,7 +147,7 @@ export function previousWorkingDayET_usMdy(): string {
 
 /**
  * First US working day strictly after **today’s** calendar date in America/New_York.
- * Skips weekends and US `public` / `bank` holidays.
+ * Skips weekends and NYSE full-day closures.
  */
 export function nextWorkingDayET_usMdy(): string {
   let cur = DateTime.now().setZone(NY_TZ).startOf('day').plus({ days: 1 });
@@ -120,7 +180,7 @@ export function todayET_usMdy(): string {
 }
 
 /**
- * Whether **today** in America/New_York is a weekday closed by a US `public` / `bank` holiday.
+ * Whether **today** in America/New_York is a weekday closed by an NYSE full-day holiday.
  * Weekends are excluded (handled separately elsewhere when needed).
  */
 export function isUsHolidayClosureTodayET(): boolean {
@@ -254,7 +314,7 @@ export function assertUsMdyMatchesExpected(
 
 /**
  * Views that roll to "today" after the intraday publish window (09:50 ET), but stay on the
- * previous working day all day on US holiday weekdays (no intraday values published).
+ * previous working day all day on NYSE holiday weekdays (no intraday values published).
  */
 function expectedIntradayRollWithHolidayClosure(
   viewName: string,
@@ -263,7 +323,7 @@ function expectedIntradayRollWithHolidayClosure(
   if (isUsHolidayClosureTodayET()) {
     return expectedUsMdyExact(
       previousWorkingDayET_usMdy_n(1),
-      `US holiday: no intraday publish; ${viewName} stays on previous working day.`,
+      `NYSE holiday: no intraday publish; ${viewName} stays on previous working day.`,
     );
   }
   if (currentAsOfPublishWindowET() === 'after_window') {
@@ -287,7 +347,7 @@ function expectedIntradayRollWithHolidayClosure(
  * These are intentionally time-dependent in America/New_York and account for:
  * - weekend tolerance where feeds can lag
  * - intraday publish windows (some views roll to "today" after a time cutoff)
- * - US holiday weekdays without intraday publish (those views stay on previous working day)
+ * - NYSE holiday weekdays without intraday publish (those views stay on previous working day)
  * - performance month-end snapshot behavior
  */
 export const expectedAsOf = {
@@ -329,7 +389,7 @@ export const expectedAsOf = {
       return isUsHolidayClosureTodayET()
         ? expectedUsMdyExact(
             nextWorkingDayET_usMdy(),
-            'Holdings table on a US holiday shows the next working day (FoF and non-FoF).',
+            'Holdings table on an NYSE holiday shows the next working day (FoF and non-FoF).',
           )
         : expectedUsMdyExact(todayET_usMdy(), 'Holdings table shows today (FoF and non-FoF).');
     },
@@ -358,7 +418,7 @@ export function assertAsOfIsPreviousWorkingDayET(usMdy: string): void {
         '"Data as of" does not match the previous U.S. working day (America/New_York).',
         '',
         `Shown on site or CSV: ${actual}`,
-        `Expected (last U.S. business day before today — weekends skipped; federal public/bank holidays skipped; Easter Sunday not counted as a closure): ${expected}`,
+        `Expected (last U.S. equity-market session before today — weekends skipped; NYSE full-day closures skipped): ${expected}`,
         '',
         'If the table is still being updated, the as-of date may be behind; once the feed is current, this check should pass.',
       ].join('\n'),
