@@ -39,8 +39,8 @@ export class ProductTablePage {
    */
   constructor(readonly page: Page) {
     this.activeTabpanel = page.getByRole('tabpanel').filter({ visible: true }).first();
-    // Scope the table lookup to the active tabpanel to avoid accidentally selecting unrelated tables.
-    this.mainTable = this.activeTabpanel.getByRole('table').first();
+    // Use the data table (has body rows), not the sticky-header clone that sits first in the tabpanel.
+    this.mainTable = this.activeTabpanel.locator('table').filter({ has: page.locator('tbody tr') }).first();
     this.cookieDismiss = page.getByRole('link', { name: /dismiss/i }).first();
     this.clearFiltersButton = page.getByRole('button', { name: /Clear filters/i }).first();
     this.filtersAccordionToggle = page.getByText(/Filter:\s*/i).first();
@@ -222,21 +222,51 @@ export class ProductTablePage {
   ]);
 }
 
-  /** Ticker symbols from the sticky first column (`th[scope="row"]`). */
+  /**
+   * 0-based index of a named header in this table (any `<thead>` row).
+   *
+   * Matches the header’s first token so “Ticker” still works if the cell has extra tooltip text.
+   */
+  private async columnIndexByHeader(headerName: string): Promise<number> {
+    const idx = await this.mainTable.evaluate((tbl, name) => {
+      const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ');
+      const want = name.trim().toLowerCase();
+      const rows = Array.from(tbl.querySelectorAll('thead tr'));
+      for (const row of rows) {
+        const cells = Array.from(row.children);
+        for (let i = 0; i < cells.length; i++) {
+          const text = normalize(cells[i]?.textContent ?? '');
+          const first = (text.split(/\s+/)[0] ?? '').toLowerCase();
+          if (text.toLowerCase() === want || first === want) return i;
+        }
+      }
+      return -1;
+    }, headerName);
+    expect(idx, `Product Table: expected a "${headerName}" column header`).toBeGreaterThanOrEqual(0);
+    return idx;
+  }
+
+  /**
+   * Ticker symbols from the **Ticker** column (by header name, not column position).
+   *
+   * The table’s first column is “My ETF” (favorite star); tickers live in the Ticker column.
+   */
   async collectTickerSymbols(): Promise<string[]> {
     await this.dismissCookieBannerIfPresent();
-    return await this.mainTable.evaluate((tbl) => {
+    const tickerIdx = await this.columnIndexByHeader('Ticker');
+    return await this.mainTable.evaluate((tbl, colIdx) => {
       const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim();
       const out: string[] = [];
       const rows = Array.from(tbl.querySelectorAll('tbody tr'));
       for (const row of rows) {
-        const th = row.querySelector('th[scope="row"]');
-        const text = normalize(th?.textContent ?? '');
+        const cell = row.children[colIdx] as HTMLElement | undefined;
+        const link = cell?.querySelector('a');
+        const text = normalize(link?.textContent ?? cell?.textContent ?? '');
         const symbol = (text.split(/\s+/)[0] ?? '').trim();
         out.push(symbol);
       }
       return out;
-    });
+    }, tickerIdx);
   }
 
   /**
@@ -246,11 +276,14 @@ export class ProductTablePage {
    */
   async assertNoEmptyCells(opts?: { skipRowTickers?: readonly string[] }): Promise<void> {
     const skip = new Set((opts?.skipRowTickers ?? []).map((t) => t.toUpperCase()));
+    const tickerIdx = await this.columnIndexByHeader('Ticker');
+    
     await assertNoEmptyTbodyCells(this.mainTable, {
       context: 'Product Table: no empty cells in <tbody>',
       rowKeyCss: 'th[scope="row"]',
       rowKeyExtractor: 'first_token',
       skipRowKeys: skip,
+      skipColumnNames: ['My ETF'],
     });
   }
 
