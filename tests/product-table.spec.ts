@@ -260,7 +260,11 @@ test.describe('Product table @smoke', () => {
       });
 
       filtered = await pt.collectTickerSymbols();
-      if (filtered.length > 0 && filtered.join(',') !== baseline.join(',')) break;
+      if (filtered.length === 0) {
+        await pt.clearFilters();
+        continue;
+      }
+      if (filtered.join(',') !== baseline.join(',')) break;
 
       // If we filtered down to 0 rows (or no change), reset and try another random combo.
       await pt.clearFilters();

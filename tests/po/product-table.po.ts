@@ -367,6 +367,15 @@ export class ProductTablePage {
    * Product Table filters are rendered as checkboxes. This clicks the checkbox with a matching accessible name.
    * (We intentionally avoid `getByText` because it can match unrelated nav/marketing links.)
    */
+  async waitForTableOrNoResults(): Promise<void> {
+    const noResults = this.activeTabpanel.getByText(/No results match your criteria/i).first();
+  
+    await Promise.race([
+      this.mainTable.waitFor({ state: 'visible', timeout: 60_000 }),
+      noResults.waitFor({ state: 'visible', timeout: 60_000 }),
+    ]);
+  }
+
   async applyFilterCheckboxByName(label: string | RegExp): Promise<void> {
     await this.dismissCookieBannerIfPresent();
     await this.expandFiltersIfCollapsed();
@@ -374,7 +383,7 @@ export class ProductTablePage {
     await cb.scrollIntoViewIfNeeded().catch(() => {});
     await cb.click({ timeout: 15_000 });
     await expect(cb).toBeChecked({ timeout: 15_000 });
-    await this.mainTable.waitFor({ state: 'visible', timeout: 60_000 });
+    await this.waitForTableOrNoResults();
   }
 
   /** Returns visible filter checkbox labels (accessible names). */
