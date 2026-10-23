@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/test';
-import { ALL_TICKERS, NON_FOF_TICKERS, PERFORMANCE_SKIP_TICKERS, TICKERS_FOF } from './fixtures/tickers';
+import { ALL_TICKERS, NON_FOF_TICKERS, TICKERS_FOF } from './fixtures/tickers';
 import {
   assertAsOfIsPreviousWorkingDayET,
   assertUsMdyMatchesExpected,
@@ -44,7 +44,7 @@ test.describe('Product table @smoke', () => {
     });
 
     await test.step('No empty cells in the table body', async () => {
-      await pt.assertNoEmptyCells({ skipRowTickers: PERFORMANCE_SKIP_TICKERS });
+      await pt.assertNoEmptyCells();
     });
 
     await test.step('"Data as of" equals expected value (ET)', async () => {
@@ -295,7 +295,9 @@ test.describe('Product table @smoke', () => {
 
     const sortable = await pt.listSortableColumnNames();
     // Prefer columns that are likely to reorder rows.
-    const candidates = sortable.filter((n) => !/Fact Sheet/i.test(n));
+    const candidates = sortable.filter(
+      (n) => !/Fact Sheet/i.test(n) && !n.toLowerCase().startsWith('my etf'),
+    );
     expect(candidates.length, 'should find sortable column headers').toBeGreaterThan(0);
 
     let after: string[] = [];
