@@ -30,6 +30,7 @@ test.describe('Product table @smoke', () => {
       const pt = new ProductTablePage(page);
       await pt.goto();
       await pt.openTab('Overview & Fees');
+      await pt.waitForTableOrNoResults();
     });
 
     const pt = new ProductTablePage(page);
@@ -63,6 +64,7 @@ test.describe('Product table @smoke', () => {
       const pt = new ProductTablePage(page);
       await pt.goto();
       await pt.openTab('Characteristics');
+      await pt.waitForTableOrNoResults();
     });
 
     const pt = new ProductTablePage(page);
@@ -102,6 +104,7 @@ test.describe('Product table @smoke', () => {
       const pt = new ProductTablePage(page);
       await pt.goto();
       await pt.openTab('Characteristics');
+      await pt.waitForTableOrNoResults();
     });
     const pt = new ProductTablePage(page);
 
@@ -153,6 +156,7 @@ test.describe('Product table @smoke', () => {
       const pt = new ProductTablePage(page);
       await pt.goto();
       await pt.openTab('Performance');
+      await pt.waitForTableOrNoResults();
     });
 
     const pt = new ProductTablePage(page);
@@ -184,6 +188,7 @@ test.describe('Product table @smoke', () => {
       const pt = new ProductTablePage(page);
       await pt.goto();
       await pt.openTab('Documents');
+      await pt.waitForTableOrNoResults();
     });
     const pt = new ProductTablePage(page);
 
@@ -204,8 +209,9 @@ test.describe('Product table @smoke', () => {
     testInfo.setTimeout(180_000);
     const pt = new ProductTablePage(page);
     await pt.goto();
+    await pt.waitForTableOrNoResults();
     await pt.expandFiltersIfCollapsed();
-
+    
     const baseline = await pt.collectTickerSymbols();
     expect(baseline.length, 'baseline table should have rows').toBeGreaterThan(0);
 
@@ -290,6 +296,7 @@ test.describe('Product table @smoke', () => {
     const pt = new ProductTablePage(page);
     await pt.goto();
     await pt.openTab('Overview & Fees');
+    await pt.waitForTableOrNoResults();
 
     const before = await pt.readFirstNTickers(10);
     expect(before.length, 'should have tickers before sorting').toBeGreaterThan(0);

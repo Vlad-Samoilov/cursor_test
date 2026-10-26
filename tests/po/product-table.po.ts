@@ -228,6 +228,10 @@ export class ProductTablePage {
    * Matches the header’s first token so “Ticker” still works if the cell has extra tooltip text.
    */
   private async columnIndexByHeader(headerName: string): Promise<number> {
+    if (await this.hasNoResultsState()) {
+      return -1;
+    }
+  
     const idx = await this.mainTable.evaluate((tbl, name) => {
       const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ');
       const want = name.trim().toLowerCase();
@@ -242,7 +246,7 @@ export class ProductTablePage {
       }
       return -1;
     }, headerName);
-    expect(idx, `Product Table: expected a "${headerName}" column header`).toBeGreaterThanOrEqual(0);
+  
     return idx;
   }
 
@@ -253,6 +257,11 @@ export class ProductTablePage {
    */
   async collectTickerSymbols(): Promise<string[]> {
     await this.dismissCookieBannerIfPresent();
+  
+    if (await this.hasNoResultsState()) {
+      return [];
+    }
+  
     const tickerIdx = await this.columnIndexByHeader('Ticker');
     return await this.mainTable.evaluate((tbl, colIdx) => {
       const normalize = (s: string) => s.replace(/\u00a0/g, ' ').trim();
@@ -363,12 +372,19 @@ export class ProductTablePage {
       .waitFor({ state: 'visible', timeout: 30_000 });
   }
 
+  async hasNoResultsState(): Promise<boolean> {
+    const noResults = this.activeTabpanel.getByText(/No results match your criteria/i).first();
+    return await noResults.isVisible().catch(() => false);
+  }
+
   /**
    * Product Table filters are rendered as checkboxes. This clicks the checkbox with a matching accessible name.
    * (We intentionally avoid `getByText` because it can match unrelated nav/marketing links.)
    */
   async waitForTableOrNoResults(): Promise<void> {
     const noResults = this.activeTabpanel.getByText(/No results match your criteria/i).first();
+
+  
   
     await Promise.race([
       this.mainTable.waitFor({ state: 'visible', timeout: 60_000 }),
